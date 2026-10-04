@@ -9,7 +9,7 @@ export default function FinishForm({
 }) {
   const [values, setValues] = useState({
     actual_duration_minutes: suggestedMinutes,
-    enjoyment_rating: 3,
+    enjoyment_rating: "",
     progress: "",
     notes: "",
     mark_goal_completed: false,
@@ -19,6 +19,10 @@ export default function FinishForm({
     setValues((previous) => ({ ...previous, [key]: value }));
   function submit(event) {
     event.preventDefault();
+    if (!Number.isInteger(values.enjoyment_rating) || values.enjoyment_rating < 1 || values.enjoyment_rating > 5) {
+      setValidation("Choose an enjoyment rating from 1 to 5.");
+      return;
+    }
     if (
       !Number.isInteger(values.actual_duration_minutes) ||
       values.actual_duration_minutes < 1 ||
@@ -66,8 +70,10 @@ export default function FinishForm({
           <SelectField
             label="How much did you enjoy it?"
             value={values.enjoyment_rating}
-            onChange={(value) => change("enjoyment_rating", Number(value))}
+            required
+            onChange={(value) => change("enjoyment_rating", value === "" ? "" : Number(value))}
             options={[
+              ["", "Choose a rating…"],
               [1, "1 · Not enjoyable"],
               [2, "2 · A little"],
               [3, "3 · Okay"],

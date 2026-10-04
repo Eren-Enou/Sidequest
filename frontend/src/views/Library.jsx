@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { ErrorNotice } from "../components/UI.jsx";
 import { GameForm, GoalForm } from "../forms/LibraryForms.jsx";
+import OutcomeInsights from "../components/OutcomeInsights.jsx";
 
 export default function Library() {
   const [games, setGames] = useState([]),
@@ -271,6 +272,7 @@ export default function Library() {
                   goals and session records are preserved.
                 </p>
               )}
+              <OutcomeInsights key={game.id} gameId={game.id} />
               {goalEditor !== null && (
                 <GoalForm
                   key={goalEditor === "new" ? "new" : goalEditor.id}

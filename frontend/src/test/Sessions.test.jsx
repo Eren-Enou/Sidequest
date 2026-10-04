@@ -160,8 +160,12 @@ async function finishForm(user) {
   await user.click(
     screen.getByRole("button", { name: "Finish Sidequest", exact: true }),
   );
+  // Existing lifecycle scenarios explicitly choose a rating under the new contract.
+  await user.selectOptions(screen.getByLabelText("How much did you enjoy it?"), "3");
 }
 async function save(user) {
+  const rating = screen.getByLabelText("How much did you enjoy it?");
+  if (rating.value === "") await user.selectOptions(rating, "3");
   await user.type(screen.getByLabelText("Progress"), "Level 23 → 25");
   await user.click(
     screen.getByRole("button", { name: "Save completed Sidequest" }),

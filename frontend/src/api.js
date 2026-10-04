@@ -48,6 +48,7 @@ export async function request(path, options = {}) {
 export const api = {
   games: () => request("/games?include_archived=true"),
   goals: (gameId) => request(`/goals?game_id=${gameId}&include_archived=true`),
+  outcomes: (gameId) => request(`/games/${gameId}/outcomes`),
   saveGame: (body, id) =>
     request(`/games${id ? `/${id}` : ""}`, {
       method: id ? "PATCH" : "POST",

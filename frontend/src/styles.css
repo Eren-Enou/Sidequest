@@ -617,6 +617,32 @@ input[type="radio"] {
   padding-top: 22px;
   margin-top: 24px;
 }
+.outcome-insights {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin: 20px 0;
+}
+.outcome-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  font-size: 0.9rem;
+}
+.outcome-table caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.outcome-table th, .outcome-table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.outcome-recent { padding-left: 20px; }
+.outcome-recent li { margin: 12px 0; }
+.outcome-recent span { display: block; }
 @media (max-width: 900px) {
   .app-shell {
     padding: 0 22px;

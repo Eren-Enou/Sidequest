@@ -12,6 +12,8 @@ from app.database import serialize_postgresql_write
 from app.schemas import GameCreate, GamePatch, GameRead, GoalCreate, GoalPatch, GoalRead, GoalStatus, SQLITE_INTEGER_MAX
 from app.recommendations import evaluate
 from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, response_from_result
+from app.outcome_schemas import GameOutcomes
+from app.outcomes import summarize_game
 
 router = APIRouter(prefix="/api")
 
@@ -77,6 +79,12 @@ def list_games(db: DB, include_archived: bool = False):
 @router.get("/games/{game_id}", response_model=GameRead)
 def get_game(game_id: RecordID, db: DB):
     return game_or_404(db, game_id)
+
+
+@router.get("/games/{game_id}/outcomes", response_model=GameOutcomes)
+def game_outcomes(game_id: RecordID, db: DB):
+    game_or_404(db, game_id)
+    return summarize_game(db, game_id)
 
 
 @router.patch("/games/{game_id}", response_model=GameRead)

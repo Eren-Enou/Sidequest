@@ -6,6 +6,21 @@ A personal gaming session recommendation web application answering: **What shoul
 
 **Sidequest V0.1 is complete.** All six milestones and all nine acceptance criteria are satisfied: library management, deterministic explained recommendations, session start/recovery/finish, and preserved History work through the local browser interface. Report 009's acceptance blocker was repaired with a narrowly bounded snapshot numerical-consistency check; scoring policy `v0.1-final-004` remains byte-for-byte frozen. See [report 010](reports/010_v0.1_snapshot_validation_fix.md) for final regression, browser, and acceptance evidence.
 
+## Session outcome insights
+
+In **Library**, select a game and choose **Show outcome insights**. The read-only
+panel shows all completed-session counts, the 1–5 enjoyment distribution, counted
+averages, the five most recent outcomes, and recorded experience/energy breakdowns.
+Archived games retain their evidence. **Refresh outcome insights** reloads it.
+
+`GET /api/games/{game_id}/outcomes` owns these descriptive aggregates. Active
+sessions are excluded. No history yields a null average and an explicit empty
+state. Insights do not affect recommendation scoring or ordering.
+
+Finishing a session now requires an explicit enjoyment selection. Older rating-3
+records remain included because deliberate selections cannot be distinguished from
+the former default. No migration is needed. See [report 018](reports/018_session_outcome_insights.md).
+
 ## Stack and layout
 
 Python 3.12, FastAPI, Pydantic, synchronous SQLAlchemy, SQLite, React/JavaScript, and Vite are implemented.

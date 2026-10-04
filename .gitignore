@@ -49,3 +49,7 @@ Desktop.ini
 # Personal PostgreSQL logical backups
 *.dump
 *.dump.*
+
+
+*.sidequest-2026-10-04T064135Z.dump
+.vs/
