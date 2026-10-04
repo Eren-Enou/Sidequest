@@ -3,12 +3,15 @@ import { api } from "./api.js";
 import { ErrorNotice } from "./components/UI.jsx";
 import Library from "./views/Library.jsx";
 import Tonight from "./views/Tonight.jsx";
+import ActiveSession from "./views/ActiveSession.jsx";
+import History from "./views/History.jsx";
 
 export default function App() {
   const [view, setView] = useState("tonight");
   const [active, setActive] = useState(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const [completion, setCompletion] = useState(null);
   const activeRequest = useRef(0);
   const refreshActive = useCallback(async () => {
     const requestId = ++activeRequest.current;
@@ -28,6 +31,23 @@ export default function App() {
   useEffect(() => {
     refreshActive();
   }, [refreshActive]);
+  function onStarted(row) {
+    activeRequest.current++;
+    setActive(row);
+    setCompletion(null);
+    setView("session");
+  }
+  function onFinished(
+    row,
+    message = "Sidequest complete. Your progress is saved.",
+  ) {
+    activeRequest.current++;
+    setActive(null);
+    setChecking(false);
+    setError("");
+    setCompletion({ row, message });
+    setView("history");
+  }
 
   return (
     <div className="app-shell">
@@ -53,6 +73,20 @@ export default function App() {
             Tonight
           </button>
           <button
+            aria-current={view === "history" ? "page" : undefined}
+            onClick={() => setView("history")}
+          >
+            History
+          </button>
+          {active && (
+            <button
+              aria-current={view === "session" ? "page" : undefined}
+              onClick={() => setView("session")}
+            >
+              Active session
+            </button>
+          )}
+          <button
             aria-current={view === "library" ? "page" : undefined}
             onClick={() => setView("library")}
           >
@@ -62,6 +96,24 @@ export default function App() {
         <span className="shell-caption">A little time. A good quest.</span>
       </header>
       <main>
+        {completion && (
+          <div className="notice completion-notice" role="status">
+            {completion.message}{" "}
+            <button
+              onClick={() => {
+                setView("history");
+              }}
+            >
+              View completed Sidequest
+            </button>
+            <button
+              aria-label="Dismiss completion message"
+              onClick={() => setCompletion(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {checking && (
           <p role="status" className="quiet">
             Checking your active session…
@@ -90,11 +142,31 @@ export default function App() {
         )}
         {view === "library" ? (
           <Library />
+        ) : view === "history" ? (
+          <History
+            key={completion?.row.id || "history"}
+            initialId={completion?.row.id}
+          />
+        ) : view === "session" ? (
+          active ? (
+            <ActiveSession
+              key={active.id}
+              session={active}
+              onFinished={onFinished}
+              refreshActive={refreshActive}
+            />
+          ) : (
+            <section className="panel">
+              <h2>No active Sidequest.</h2>
+              <p>Head to Tonight to find your next quest.</p>
+              <button onClick={() => setView("tonight")}>Find a quest</button>
+            </section>
+          )
         ) : (
           <Tonight
             active={active}
             activeUnavailable={checking || Boolean(error)}
-            onStarted={setActive}
+            onStarted={onStarted}
             refreshActive={refreshActive}
           />
         )}

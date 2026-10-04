@@ -246,7 +246,7 @@ export default function Library() {
                 </button>
               </div>
               <p className="quiet">
-                Interest {game.current_interest}/5 · Setup friction{" "}
+                Interest {game.current_interest}/5 · Getting-started effort{" "}
                 {game.friction}/5 · {game.energy_required} energy
               </p>
               {game.notes && <p className="notes">{game.notes}</p>}

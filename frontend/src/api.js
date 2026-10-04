@@ -75,4 +75,8 @@ export const api = {
       },
     }),
   active: () => request("/sessions/active"),
+  finish: (id, body) =>
+    request(`/sessions/${id}/finish`, { method: "POST", body }),
+  history: () => request("/sessions"),
+  session: (id) => request(`/sessions/${id}`),
 };

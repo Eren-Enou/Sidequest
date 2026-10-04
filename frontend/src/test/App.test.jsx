@@ -81,6 +81,13 @@ const active = {
   game_title_snapshot: game.title,
   goal_title_snapshot: goal.title,
   started_at: "2026-10-03T19:00:00Z",
+  finished_at: null,
+  situation_snapshot: context,
+  recommendation_snapshot: {
+    snapshot_version: 1,
+    selected: choice,
+    evaluation: result,
+  },
 };
 let games, goals, recommendation, session, conflict;
 const reply = (payload, status = 200) =>
@@ -111,6 +118,14 @@ beforeEach(() => {
         session = {
           ...active,
           goal_title_snapshot: body.goal_id === 2 ? "Build a shed" : goal.title,
+          situation_snapshot: body.situation,
+          recommendation_snapshot: {
+            snapshot_version: 1,
+            selected: recommendation.recommendations.find(
+              (item) => item.candidate.goal_id === body.goal_id,
+            ),
+            evaluation: recommendation,
+          },
         };
         return reply(session, 201);
       }
@@ -304,6 +319,13 @@ describe("Tonight", () => {
       { game_id: 1, goal_id: 1, situation: context },
     ]);
     expect(
+      screen.getByRole("button", { name: "Finish Sidequest" }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole("button", { name: "Tonight", exact: true }),
+    );
+    await recommend(user);
+    expect(
       screen.getByRole("button", { name: "A session is already active" }),
     ).toBeDisabled();
   });
@@ -343,9 +365,12 @@ describe("Tonight", () => {
     expect(
       screen.getByRole("button", { name: "A session is already active" }),
     ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "Active session", exact: true }),
+    );
     expect(
-      screen.queryByRole("button", { name: /Finish session/ }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Finish Sidequest" }),
+    ).toBeEnabled();
   });
   it("handles a session started in another tab", async () => {
     const user = await ready();
@@ -413,7 +438,10 @@ describe("Library", () => {
     );
     await user.type(screen.getByLabelText("Game title"), "Clockwork Peaks");
     await user.selectOptions(screen.getByLabelText("Current interest"), "5");
-    await user.selectOptions(screen.getByLabelText("Setup friction"), "2");
+    await user.selectOptions(
+      screen.getByLabelText("How hard is it to get started?"),
+      "2",
+    );
     await user.selectOptions(screen.getByLabelText("Energy required"), "high");
     await user.selectOptions(screen.getByLabelText("Play style"), "both");
     await user.click(
@@ -472,8 +500,8 @@ describe("Library", () => {
     await library(user);
     await user.click(screen.getByRole("button", { name: "Add goal" }));
     await user.type(screen.getByLabelText("Goal title"), "Build a greenhouse");
-    await user.clear(screen.getByLabelText("Estimated minutes"));
-    await user.type(screen.getByLabelText("Estimated minutes"), "20");
+    await user.clear(screen.getByLabelText("Useful session length"));
+    await user.type(screen.getByLabelText("Useful session length"), "20");
     await user.selectOptions(screen.getByLabelText("Goal priority"), "3");
     await user.click(screen.getByRole("button", { name: "Save goal" }));
     await screen.findByRole("heading", { name: "Build a greenhouse" });

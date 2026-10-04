@@ -4,7 +4,7 @@ const names = {
   time_fit: "Time fit",
   energy_fit: "Energy fit",
   experience_fit: "Experience match",
-  friction: "Setup friction",
+  friction: "Getting started",
   recent_play: "Recent play",
 };
 const number = (value) =>
@@ -27,7 +27,7 @@ export function WhyThis({ item }) {
               {Object.entries(factor.inputs)
                 .map(
                   ([key, value]) =>
-                    `${key.replaceAll("_", " ")}: ${Array.isArray(value) ? value.join(", ") : (value ?? "none")}`,
+                    `${key === "friction" ? "getting-started effort" : key === "estimated_minutes" ? "useful session minutes" : key.replaceAll("_", " ")}: ${Array.isArray(value) ? value.join(", ") : (value ?? "none")}`,
                 )
                 .join(" · ")}
             </small>

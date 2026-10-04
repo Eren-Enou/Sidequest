@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Milestones 1-5 complete (reports 004-008). Milestone 6 remains unstarted and requires further user direction.
+Status: Milestones 1-5 complete (reports 004-008). Milestone 6 interface implemented and verified; final acceptance is blocked by a backend snapshot validation defect found during larger-library testing (report 009). V0.1 is not yet declared complete.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
@@ -51,7 +51,7 @@ Completed: start-time revalidation accepts any frozen recommendation choice, val
 
 Completed: React/JavaScript/Vite interface provides Tonight and Library, all game/goal management actions, four recommendation outcomes, complete expandable explanations, alternative selection, session start and active recovery. All 26 frontend tests and 410 backend tests pass; production build and actual browser smoke flow passed. Report 008 records architecture, evidence, and limitations. No finish/history UI was implemented.
 
-## 6. React sessions and V0.1 verification
+## 6. React sessions and V0.1 verification — acceptance blocked
 
 - Add start/finish controls, active-session recovery on page load, and history views.
 - Suggest elapsed duration while allowing user confirmation/correction.
@@ -61,6 +61,8 @@ Completed: React/JavaScript/Vite interface provides Tonight and Library, all gam
 
 Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
+Implemented: full active-session view, editable elapsed-duration suggestion, finish validation/feedback/recovery, and snapshot-based History. Usability wording clarifies getting-started effort (0–5) and useful session length without changing scoring. All 51 frontend tests and 410 backend tests pass; production build and the small-library browser feedback loop pass. The 13-game / 37-goal smoke test exposes HTTP 500 on a valid session start: snapshot validation compares a projected float factor sum to the original scorer total with exact equality. An unselected audit candidate can block the winner. Report 009 contains a two-candidate reproduction. Backend code, scorer, and reports 001-008 remain unchanged. Completion is withheld pending a separately reviewed integration fix and verification recorded in report 010 or the next available number.
+
 ## First implementation recommendation
 
-Milestones 1-5 are complete. Review reports/008_milestone_5_react_library_recommendation.md before authorizing Milestone 6, the finish/history UI and full V0.1 verification. Start and active recovery are already implemented; Milestone 6 should extend them. The scoring policy and backend behavior remain frozen; integration problems must be reported instead of silently changing them.
+Review report 009's numeric snapshot-validation counterexample before continuing. The next required work is a small backend integration correction and regression coverage that preserves scorer output, ranking, and all saved evidence; then repeat affected browser and acceptance checks in a new immutable report. No post-V0.1 features should begin. The scoring policy and backend behavior were preserved during this milestone; the integration problem is reported for review rather than silently changed.

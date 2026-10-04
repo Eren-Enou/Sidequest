@@ -168,4 +168,4 @@ number, title, date, milestone, one-sentence purpose, and outcome/status. Never 
 a repeatedly overwritten generic `report.md` for experiment results. Use the
 user's local date for the report date and explicit timestamps for engine inputs.
 
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the proposed sequence. Milestone 1 is complete with the adopted production policy; subsequent milestones await review.
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the sequence. Milestones 1-5 are complete and the Milestone 6 browser interface is implemented. Final V0.1 acceptance is blocked by a numeric snapshot-validation defect found during larger-library session-start testing; [report 009](reports/009_milestone_6_v0.1_completion.md) preserves the counterexample and all nine acceptance outcomes. The scoring policy remains frozen. V0.1 completion is withheld pending a separately reviewed integration fix and verification in a new report.

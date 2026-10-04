@@ -76,16 +76,17 @@ export function GameForm({ game, onSave, onCancel, busy }) {
             ]}
           />
           <SelectField
-            label="Setup friction"
+            label="How hard is it to get started?"
+            hint="The effort between deciding to play and getting into the activity — not game difficulty."
             value={values.friction}
             onChange={(v) => change("friction", Number(v))}
             options={[
               [0, "0 · Jump right in"],
-              [1, "1 · Very little"],
-              [2, "2 · Some setup"],
-              [3, "3 · Moderate effort"],
-              [4, "4 · A lot to arrange"],
-              [5, "5 · Hard to get going"],
+              [1, "1 · Very easy"],
+              [2, "2 · Easy"],
+              [3, "3 · Some effort"],
+              [4, "4 · A hassle"],
+              [5, "5 · Big commitment"],
             ]}
           />
         </div>
@@ -195,8 +196,8 @@ export function GoalForm({ goal, gameId, onSave, onCancel, busy }) {
         </Field>
         <div className="form-row">
           <Field
-            label="Estimated minutes"
-            hint="A useful session chunk, not total completion time."
+            label="Useful session length"
+            hint="About how much time would make a session working on this goal feel worthwhile? A rough estimate is fine. In minutes, not total goal-completion time."
           >
             <input
               type="number"

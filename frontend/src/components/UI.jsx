@@ -1,3 +1,5 @@
+import { cloneElement, useId } from "react";
+
 export function ErrorNotice({ message }) {
   return message ? (
     <div className="notice error" role="alert">
@@ -20,9 +22,16 @@ export function Field({ label, children, hint }) {
   );
 }
 
-export function SelectField({ label, value, onChange, options, ...rest }) {
+export function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+  ...rest
+}) {
   return (
-    <Field label={label}>
+    <Field label={label} hint={hint}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -49,4 +58,3 @@ export const experiences = [
   ["challenge", "Challenge"],
   ["novelty", "Novelty"],
 ];
-import { cloneElement, useId } from "react";

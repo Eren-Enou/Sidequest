@@ -1,10 +1,12 @@
 {
   "ExpandedNodes": [
     "",
+    "\\backend",
+    "\\backend\\app",
     "\\frontend",
     "\\frontend\\src",
     "\\frontend\\src\\components"
   ],
-  "SelectedNode": "\\frontend\\src\\components\\Recommendation.jsx",
+  "SelectedNode": "\\backend\\app\\database.py",
   "PreviewInSolutionExplorer": false
 }

@@ -4,7 +4,7 @@ A personal gaming session recommendation web application answering: **What shoul
 
 ## Current status
 
-Milestones 1-5 are complete: frozen scoring policy `v0.1-final-004`, SQLite persistence, library/recommendation/session APIs, and a React library and recommendation interface. You can maintain games/goals, get explained recommendations, and start a session in the browser. Finish and history screens remain Milestone 6 and require a separate instruction.
+Milestones 1-5 are complete. Milestone 6 adds the active-session, finish, and history interface, completing the browser flow on the small smoke library. Final V0.1 acceptance is **blocked**: a larger-library smoke test exposed exact floating-point equality in backend snapshot validation that can reject a valid session start with HTTP 500. The frozen scoring policy `v0.1-final-004` and backend remain unchanged. See [report 009](reports/009_milestone_6_v0.1_completion.md) for the reproducible counterexample and acceptance checklist.
 
 ## Stack and layout
 
@@ -20,6 +20,7 @@ backend/
   data/         # Local SQLite database, ignored by Git
 frontend/
   src/          # App shell, API access, views, forms, components, frontend tests
+  scripts/      # API-only fictional library seeder for isolated smoke databases
   package.json  # React/Vite and test commands; locked dependencies
 reports/        # Immutable numbered reports and mutable index
 PROJECT.md
@@ -188,11 +189,17 @@ npm run dev
 
 Open [Sidequest at localhost:5173](http://127.0.0.1:5173). Vite binds to loopback and proxies `/api` to the backend at port 8000. The browser uses relative URLs. For a backend on another local port, set `$env:SIDEQUEST_API_TARGET = 'http://127.0.0.1:8015'` before running Vite. The development server uses a strict port to avoid silently moving to another URL.
 
-**Library:** add a game with interest, setup effort, energy, play style, experiences, and notes; select it to add session-sized goals. Games can be edited, archived, or restored. Goals can be edited, completed/reopened, archived, or restored. Archived games can be shown using the shelf checkbox. Restore an archived parent before adding/reopening/completing its goals.
+**Library:** add a game with interest, getting-started effort, energy, play style, experiences, and notes; select it to add goals. “How hard is it to get started?” measures resistance to starting, not game difficulty, and preserves the API's six values 0–5. “Useful session length” is a rough worthwhile chunk of play on a goal, not total goal-completion time. Games can be edited, archived, or restored. Goals can be edited, completed/reopened, archived, or restored. Archived games can be shown using the shelf checkbox. Restore an archived parent before adding/reopening/completing its goals.
 
 **Tonight:** describe time, energy, social preference, and desired experience. Results show the game/goal, score, suitability, and expandable factor calculations. Equivalent choices are presented together with a radio selection. Empty/poor-fit outcomes explain what to adjust. Starting sends the selected pair and evaluated situation to the backend for fresh validation. Conflicts offer a recommendation refresh. An active-session banner survives page reload and blocks duplicate starts.
 
-Finish controls and History navigation have not been implemented. For now, finish an active session through the documented API or `/docs` before starting another. The UI checks the backend on load and after a start conflict; changes made in another tab may require a reload. There is no browser-only session state or scoring calculation.
+**Active session:** starting opens the saved game/goal, start time, local elapsed timer, original situation, score, suitability, and expandable explanation. Reload recovers the backend record; select Active session to continue. Timer ticks never write to the database.
+
+**Finish Sidequest:** confirm or edit suggested elapsed minutes, rate enjoyment 1–5, describe progress, and optionally add notes or mark the goal complete. The existing API handles atomic goal completion. Successful finish clears the active session and opens its History detail. A duplicate finish or lost write response triggers a read of the saved result; an unresolved conflict keeps the draft while the backend record remains active. Unsaved form drafts and selected screens do not survive reload.
+
+**History:** browse date, snapshot titles, actual minutes, enjoyment, and progress; inspect notes, timestamps, original context, and saved score factors. Library edits/archives do not replace historical evidence. The next recommendation gets recency from completed backend sessions. There is no frontend scoring or recency calculation. Other-tab changes may require reload.
+
+Known blocker: recommendations can be displayed correctly yet fail at start if any eligible audit candidate encounters the snapshot numeric-equality defect described in report 009. Do not treat the passing test suites as full V0.1 readiness until that integration defect is resolved and reverified in a new numbered report.
 
 Frontend verification from `frontend/`:
 
@@ -202,6 +209,14 @@ npm run build
 npm run preview
 ```
 
-Milestone 5: **26 frontend tests passed**, all **410 backend tests passed**, and the production build passed. The actual browser smoke loop created a game and goal, recommended, inspected factors, started, and recovered the session after reload using an isolated temporary database. The production bundle was also browser-checked. See [report 008](reports/008_milestone_5_react_library_recommendation.md).
+Milestone 6 verification: **51 frontend tests passed** (26 preserved + 25 added), all **410 backend tests passed**, and the production build passed. An actual browser completed creation → recommendation → start → reload/recovery → finish → history → recency feedback, then confirmed snapshot preservation after renaming/archiving. A 13-game / 37-goal library exposed the session-start blocker. See [report 009](reports/009_milestone_6_v0.1_completion.md); historical Milestone 5 evidence remains in [report 008](reports/008_milestone_5_react_library_recommendation.md).
+
+To repeat the larger-library observation, explicitly migrate a new temporary database, run the API against that file and a distinct loopback port, and point Vite's proxy at that port. Then, from the repository root:
+
+```powershell
+backend/.venv/Scripts/python.exe frontend/scripts/seed_smoke_library.py http://127.0.0.1:8016
+```
+
+This adds 12 fictional games and 36 goals through the library API, including archived/completed records. Each run adds new records. Use an isolated database, never the personal library. The report records the two situation inputs and the additional game/goal created in the browser.
 
 `npm run preview` is a local build check, not deployment infrastructure; it inherits the same local API proxy. Production hosting is deferred; any eventual host must serve `/api` on the same origin. No Docker, authentication, cloud services, or deployment configuration is required for this local application.
