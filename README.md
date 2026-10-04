@@ -6,7 +6,7 @@ Sidequest will recommend game/goal pairs using a deterministic scoring engine an
 
 ## Current status
 
-Planning and directory scaffolding only. There is no runnable application, dependency manifest, database, or implemented API yet. The workspace was initially empty and was not a Git repository. Application implementation awaits plan review.
+Milestone 1 implements the deterministic Python scoring engine, pytest coverage, and a runnable fictional example. Database, API, and frontend work have not begun. Subsequent milestones await review.
 
 ## Planned stack
 
@@ -18,8 +18,9 @@ Planning and directory scaffolding only. There is no runnable application, depen
 
 ```text
 backend/
-  app/          # Future API, schemas, models, database, scoring modules
-  tests/        # Future scoring and API/persistence tests
+  app/          # Pure scoring module; API/persistence come later
+  examples/     # Runnable fictional recommendation example
+  tests/        # Scoring tests; API/persistence tests come later
   data/         # Local SQLite database (ignored)
 frontend/
   src/          # Future React screens and components
@@ -27,7 +28,21 @@ PROJECT.md      # Scope, architecture, model, scoring, acceptance criteria
 IMPLEMENTATION_PLAN.md
 ```
 
-## Eventual development setup
+## Run Milestone 1
+
+Python 3.12 was used for verification. From the repository root in PowerShell:
+
+```powershell
+py -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+Set-Location backend
+.venv/Scripts/python.exe -m pytest
+.venv/Scripts/python.exe -m examples.recommendation
+```
+
+The engine uses only the standard library. Import `Candidate`, `SessionContext`, and `recommend` from `app.scoring`; pass a timezone-aware `evaluated_at` explicitly. The example prints rankings, numeric breakdowns, factor inputs/reasons, and exclusions. See PROJECT.md for scales and formulas.
+
+## Eventual application development setup
 
 These are intended commands, not available functionality today. Python/package versions and manifests will be selected during implementation.
 
@@ -53,4 +68,4 @@ The planned API runs at `http://127.0.0.1:8000`; Vite normally runs at `http://l
 
 The SQLite database will live under `backend/data/`. It is personal local data and is excluded from source control. Schema initialization/migration and backup instructions will be added when persistence exists.
 
-Read [PROJECT.md](PROJECT.md) and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) before implementation. Start with the scoring engine after the plan has been reviewed.
+Read [PROJECT.md](PROJECT.md) and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) before implementation. Review the scoring behavior before proceeding to the database milestone.

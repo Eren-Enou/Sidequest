@@ -12,7 +12,7 @@ It connects a user's games and goals to their available time, energy, social pre
 
 - Add, view, edit, and archive games.
 - Add, view, edit, complete, and archive goals associated with games.
-- Collect available minutes, energy (low/medium/high), solo/social preference, and one desired experience (progression/chill/challenge/novelty).
+- Collect available minutes, energy (low/medium/high), solo/social/either preference, and one desired experience (progression/chill/challenge/novelty).
 - Rank eligible game/goal pairs using explicit scoring rules.
 - Show the highest-ranked recommendation, its total score, and each factor's calculation. Handle an empty eligible set clearly.
 - Start a session from a recommendation and finish it with actual duration, enjoyment, progress, and notes.
@@ -48,6 +48,8 @@ All records have integer IDs. Store timestamps in UTC; display them in the brows
 | --- | --- |
 | id, title | Identity and required display name |
 | notes | Optional free text |
+| current_interest | Integer 1-5; default 3; user-maintained interest |
+| friction | Integer 0-5; default 0; setup/coordination effort |
 | energy_required | low, medium, or high |
 | social_mode | solo, social, or both |
 | experience_tags | One or more of progression, chill, challenge, novelty; small validated JSON list |
@@ -85,7 +87,7 @@ One active session at a time. Starting and finishing must enforce this rule and 
 
 ### Situation (request object, not a separate table)
 
-`available_minutes` is a positive integer; `energy` is low/medium/high; `social_preference` is solo/social; `desired_experience` is one of the four experience values. Persistent preference profiles are deferred. Store these inputs with a started session.
+`available_minutes` is a positive integer; `energy` is low/medium/high; `social_preference` is solo/social/either; `desired_experience` is one of the four experience values. Persistent preference profiles are deferred. Store these inputs with a started session.
 
 ## Recommendation-engine concept
 
@@ -93,25 +95,34 @@ The ranking unit is an active goal paired with its active game. A game without a
 
 ### Eligibility
 
-Exclude archived games, non-active goals, social-mode mismatches (both accepts either preference), and goals whose estimated minutes exceed available minutes. Energy is a soft score, allowing users to choose a demanding game when they have low energy. If nothing qualifies, show why candidates were excluded and suggest adjusting inputs or goal estimates. Do not silently relax filters.
+Exclude archived games, non-active goals, social-mode mismatches (both accepts either explicit preference; the either preference accepts every mode), and goals whose estimated minutes exceed available minutes. Energy is a soft score, allowing users to choose a demanding game when they have low energy. If nothing qualifies, show why candidates were excluded and suggest adjusting inputs or goal estimates. Do not silently relax filters.
 
-### Proposed scoring rules (engine version `v0.1`)
+### Implemented scoring rules (engine version `v0.1`)
 
-Each eligible pair receives 0–100 points:
+The pure Python engine is implemented in `backend/app/scoring.py`. It consumes validated frozen domain objects representing flattened game/goal pairs, a session context, and a required timezone-aware evaluation timestamp. It has no runtime dependencies beyond Python's standard library.
 
-| Factor | Maximum | Calculation |
+| Factor | Weight | Calculation |
 | --- | --- | --- |
-| Time fit | 30 | `30 × estimated_minutes / available_minutes` |
-| Energy fit | 25 | Map low/medium/high to 1/2/3. Award 25 if required energy ≤ available energy, 12.5 if one level above, 0 if two levels above. |
-| Experience fit | 25 | 25 if the requested experience is among the game's tags, otherwise 0 |
-| Goal priority | 10 | Priority 1/2/3 awards 0/5/10 |
-| Variety | 10 | 10 if never played; otherwise `10 × min(days_since_last_completed_session / 7, 1)` for this game |
+| Interest | 25 | `25 * (interest - 1) / 4`, interest 1-5 |
+| Goal priority | 15 | `15 * (priority - 1) / 2`, priority 1-3 |
+| Time fit | 15 | `15 * estimated_minutes / available_minutes` |
+| Energy fit | 15 | Full points if energy is sufficient; half if requirement is one level above; zero if two above |
+| Social fit | 10 | Full points for every eligible candidate |
+| Experience fit | 20 | Full points for a matching game experience tag, otherwise zero |
+| Friction | -10 maximum penalty | `-10 * friction / 5`, friction 0-5 |
+| Recent play | -10 maximum penalty | `-10 * max(0, 1 - days_since_last_completed_session / 7)`; never played receives no penalty |
 
-Time fit intentionally favors a goal that uses more of the available window. Estimates describe a useful chunk of play, so this policy can be revised after real use. Novelty is a manually assigned experience tag; variety is a separate recency factor.
+Positive weights total 100; penalties can reduce scores below zero (the theoretical default range is -20 to 100). Scores are points, not percentages, and are not clamped. Weights are centralized in an immutable `ScoringWeights` object and may be supplied explicitly for experiments; results retain the weights used. Persist those weights with future recommendation snapshots.
 
-Compute elapsed days as nonnegative UTC elapsed seconds divided by 86,400, using one supplied evaluation timestamp. Only completed sessions contribute to recency. Rank by unrounded total descending, then priority descending, then goal ID ascending. Round displayed values to two decimals; retain calculation precision internally. Equal inputs, candidate data, history, evaluation time, and engine version must yield equal results.
+Time fit favors using more of the available window. Estimates describe a useful chunk of play. Interest and friction are user-maintained game attributes; priority and estimated time belong to goals. The domain candidate calls the interest field `interest`; persistence can map `current_interest` to it.
 
-Return each factor's name, maximum, input values, awarded points, and plain-language reason alongside total and engine version. Also return exclusion reasons and the ranked alternatives for inspection, even if the UI initially highlights only the winner. No hidden randomness or LLM calls.
+Social preference `either` accepts solo, social, and both. Explicit solo/social preferences reject the opposite exclusive mode. All eligible modes earn full social points, so this factor currently contributes a constant rather than distinguishing ranks.
+
+Only completed-session history contributes to recent play. The caller supplies the last completed session timestamp per game. Use timezone-aware timestamps and normalize evaluation time to UTC. Compute elapsed days from elapsed seconds / 86,400, clamping future last-play timestamps to zero elapsed days. Never played and seven-or-more days ago have no penalty. Novelty remains a manually assigned experience tag.
+
+Rank by unrounded total descending, then priority descending, then goal ID ascending (game ID is a final stable key). Goal IDs must be unique in the input. Excluded candidates are ordered by ID and retain all applicable exclusion reasons. Empty input or an entirely ineligible set returns no winner without relaxing filters.
+
+Each scored result exposes a numeric `breakdown`, whose values sum directly to `score`, plus factor weights, input values, and plain-language reasons. Keep calculations unrounded; the eventual UI may round for presentation. Results retain engine version, weights, and evaluation time. Equal inputs produce equal results regardless of candidate input order. There is no implicit clock, randomness, or LLM call.
 
 At session start, the backend revalidates the selected pair and recalculates its score from the supplied situation and current data. Store the resulting snapshot rather than trusting a client-supplied score. If the prior recommendation is no longer eligible, return a clear conflict and request a fresh recommendation.
 
@@ -137,4 +148,23 @@ At session start, the backend revalidates the selected pair and recalculates its
 - Only one session can be active, including across browser refreshes.
 - The initial weights and recency window are product hypotheses; changes require an engine-version update.
 
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the proposed sequence. Implementation is pending review.
+## Experiment and report preservation
+
+Store investigations in `reports/` as numbered Markdown files, starting with
+`001_milestone_1_engine_evaluation.md`. Allocate each new investigation the next
+number greater than every existing report number: `002_<short_descriptive_name>.md`,
+`003_<short_descriptive_name>.md`, and so on. Never reuse numbers or overwrite a
+previous experiment report, including an uncommitted report from an earlier run.
+
+Reports are immutable historical records. Once committed, never rewrite a report
+to represent a later experiment. Repeat investigations after changes in a new
+numbered report that references the earlier report. Preserve original inputs,
+engine configuration, test outcomes, and observed results. Corrections or later
+interpretations belong in a new report rather than replacing historical evidence.
+
+Maintain `reports/README.md` as the mutable index. For every new report, record its
+number, title, date, milestone, one-sentence purpose, and outcome/status. Never use
+a repeatedly overwritten generic `report.md` for experiment results. Use the
+user's local date for the report date and explicit timestamps for engine inputs.
+
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the proposed sequence. Milestone 1 is implemented; subsequent milestones await review.

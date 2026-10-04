@@ -1,14 +1,14 @@
 # Implementation plan
 
-Status: proposed; do not begin implementation until the user reviews this plan.
+Status: Milestone 1 implemented with user authorization. Milestones 2-6 remain proposed and await review.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
-## 1. Deterministic recommendation engine
+## 1. Deterministic recommendation engine - implemented
 
 - Set up the Python dependency manifest and pytest.
 - Define lightweight typed candidate/situation/result structures and input validation.
-- Implement eligibility, five score factors, stable tie handling, and structured explanations in a pure module.
+- Implement eligibility, eight score factors, stable tie handling, and structured explanations in a pure module.
 - Add focused tests for boundaries, empty sets, incompatibility, ties, recency, and repeatability using a fixed evaluation time.
 
 Done when documented examples produce expected rankings and explanations without a database, web server, or external calls. This validates the product's central behavior before UI work.
@@ -62,4 +62,4 @@ Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
 ## First implementation recommendation
 
-Begin with milestone 1 after review. Agree on goal eligibility and score weights first, then make those rules executable and testable. Keep database and UI work in subsequent milestones so scoring decisions remain easy to inspect.
+Review the implemented engine and fictional sample before milestone 2. Confirm the interest/friction scales, hard filters, and scoring weights. Database, API, and frontend work remain unimplemented.
