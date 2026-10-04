@@ -6,9 +6,9 @@ The fixed clock and fictional records require no database or network.
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import json
-from statistics import mean, pvariance
+from statistics import mean
 
-from app.scoring import Candidate, SessionContext, recommend, NEAR_TIE_MARGIN
+from app.scoring import Candidate, SessionContext, recommend
 
 NOW = datetime(2026, 10, 4, 19, tzinfo=timezone.utc)
 WINDOW = 20
@@ -49,20 +49,24 @@ def game(number, interest=4, priority=2, friction=0, **fields):
                      interest=interest, goal_priority=priority, friction=friction, **fields)
 
 
-def history(game_id, ratings, days=None, **fields):
+def history(game_id, ratings, days=None, offset=0, **fields):
     days = list(days) if days is not None else list(range(1, len(ratings) + 1))
     if len(ratings) != len(days):
         raise ValueError("ratings and dates must align")
-    return tuple(Outcome(game_id * 1000 + i, game_id, NOW - timedelta(days=day), rating,
+    return tuple(Outcome(game_id * 1000 + offset + i, game_id, NOW - timedelta(days=day), rating,
                          **fields) for i, (rating, day) in enumerate(zip(ratings, days)))
 
 
 def observed(rows, game_id, now=NOW):
     selected = []
     for row in rows:
-        if row.finished_at is None or row.finished_at > now or row.game_id != game_id:
+        if row.finished_at is None or row.game_id != game_id:
             continue
-        if row.finished_at.tzinfo is None or type(row.enjoyment_rating) is not int or not 1 <= row.enjoyment_rating <= 5:
+        if row.finished_at.tzinfo is None or row.finished_at.utcoffset() is None:
+            raise ValueError("completed outcomes need aware dates")
+        if row.finished_at > now:
+            continue
+        if type(row.enjoyment_rating) is not int or not 1 <= row.enjoyment_rating <= 5:
             raise ValueError("completed outcomes need aware dates and ratings 1..5")
         selected.append(row)
     return tuple(sorted(selected, key=lambda row: (row.finished_at, row.id), reverse=True)[:WINDOW])
@@ -89,7 +93,9 @@ def signal(rows, model, amplitude, context=CONTEXT, now=NOW):
     return amplitude * sum(v * w for v, w in zip(values, weights)) / (sum(weights) + PRIOR)
 
 
-def evaluate(scenario, model="M0", amplitude=3, now=NOW):
+def evaluate(scenario, model="M0", amplitude=3, now=NOW, positive_scale=1, negative_scale=1):
+    if not 0 <= positive_scale <= 3 or not 0 <= negative_scale <= 3:
+        raise ValueError("asymmetric scales must lie in 0..3")
     candidates = tuple(replace(candidate, last_completed_session_at=max(
         (row.finished_at for row in scenario.history if row.game_id == candidate.game_id
          and row.finished_at is not None and row.finished_at <= now), default=None))
@@ -99,6 +105,8 @@ def evaluate(scenario, model="M0", amplitude=3, now=NOW):
     suitable = [item for item in baseline.ranked if item.suitable]
     additions = {item.candidate.goal_id: signal(observed(scenario.history, item.candidate.game_id, now),
                  model, amplitude, scenario.context, now) for item in suitable}
+    additions = {key: value * (positive_scale if value > 0 else negative_scale)
+                 for key, value in additions.items()}
     if model == "M4tie":
         # Preserve the original score, choice membership, status and abstention.
         # Only reorder the already accepted band by a bounded experimental key.
@@ -137,7 +145,7 @@ def scenarios():
                  history(1, [1] * 3 + [5] * 10, [1, 2, 3] + list(range(120, 130)))),
         Scenario("I", "100 mildly positive versus 2 excellent sessions", close,
                  history(1, [4] * 100) + history(2, [5, 5])),
-        Scenario("J", "Strong explicit preference versus opposing repeated outcomes", strong,
+        Scenario("J", "Strong interest conflict at equal goal priority", (game(1, 5), game(2, 3)),
                  history(1, [1] * 8) + history(2, [5] * 8)),
         Scenario("K", "Near tie with three bad versus three excellent sessions", close,
                  history(1, [1] * 3) + history(2, [5] * 3)),
@@ -151,24 +159,28 @@ def scenarios():
                  history(1, [5] * 4, progress="No measurable progress; relaxed")
                  + history(2, [1] * 4, progress="Finished objective; disliked session")),
         Scenario("P", "Context confounding: challenge good, current progression bad", close,
-                 history(1, [1] * 3) + history(1, [5] * 10, range(4, 14),
+                 history(1, [1] * 3) + history(1, [5] * 10, range(4, 14), offset=100,
                  energy="high", desired_experience="challenge")),
         Scenario("Q", "Unsuitable favorite stays unsuitable despite perfect outcomes",
                  (replace(game(1, 5, 3), energy_required="high", experience_tags=("challenge",)), game(2)),
                  history(1, [5] * 8)),
         Scenario("R", "Time-filtered favorite stays excluded despite perfect outcomes",
                  (replace(game(1, 5, 3), estimated_minutes=120), game(2)), history(1, [5] * 8)),
+        Scenario("S", "One bad near-tie outcome with recency held equal", close,
+                 history(1, [1]) + history(2, [3])),
+        Scenario("T", "One excellent near-tie outcome with recency held equal", close,
+                 history(1, [3]) + history(2, [5])),
     )
 
 
-def loop(model, amplitude=3, cycles=30):
+def loop(model, amplitude=3, cycles=30, ratings=(5, 5)):
     scenario = Scenario("L", "closed loop", (game(1), game(2, friction=1)))
     choices = []
     for index in range(cycles):
         now = NOW + timedelta(days=index)
         winner = evaluate(scenario, model, amplitude, now)["winner"]
         choices.append(winner)
-        outcome = Outcome(10000 + index, winner, now, 5)
+        outcome = Outcome(10000 + index, winner, now, ratings[winner - 1])
         scenario = replace(scenario, history=scenario.history + (outcome,))
     longest = run = 0
     previous = None
