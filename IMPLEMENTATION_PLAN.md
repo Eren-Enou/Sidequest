@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Milestones 1-3 complete (reports 004-006). Milestones 4-6 remain unstarted and require further user direction.
+Status: Milestones 1-4 complete (reports 004-007). Milestones 5-6 remain unstarted and require further user direction.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
@@ -31,7 +31,7 @@ Completed: games/goals can be managed through API calls, data survives reopening
 
 Completed: POST /api/recommendations maps persisted library/history into the frozen scorer once at one backend timestamp, preserving all four outcomes, choice ordering, factor explanations, exclusions, and unsuitable audit entries. All 345 tests pass (315 previous + 30 new). Requests are read-only and scoring.py matches the frozen SHA-256. Report 006 records the contract and evidence.
 
-## 4. Session lifecycle and history API
+## 4. Session lifecycle and history API - complete
 
 - Add start, active-session, finish, and history endpoints.
 - Enforce a single active session with transaction/database protection, including concurrent start attempts.
@@ -39,7 +39,7 @@ Completed: POST /api/recommendations maps persisted library/history into the fro
 - At finish, require valid actual duration, enjoyment, and progress; optionally mark the goal completed in the same transaction.
 - Test duplicate start/finish, invalid inputs, snapshot preservation after edits, and restart recovery.
 
-Done when an entire session can be recorded and inspected through the API with stable historical explanations.
+Completed: start-time revalidation accepts any frozen recommendation choice, validated version-1 snapshots preserve explanations, active recovery/history survive restart, and finish optionally completes the goal atomically. SQLite writer transactions and the existing unique index protect concurrent starts; duplicate/concurrent finishes preserve history. All 410 tests pass (345 previous + 65 new), including the complete recommendation/start/finish/recency loop. Report 007 records decisions and limitations.
 
 ## 5. React library and recommendation interface
 
@@ -62,4 +62,4 @@ Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
 ## First implementation recommendation
 
-Milestones 1-3 are complete. Review reports/006_milestone_3_recommendation_api.md before authorizing Milestone 4, session lifecycle and history. Session endpoints and frontend work remain unimplemented. The scoring policy is frozen; integration problems must be reported instead of silently changing it.
+Milestones 1-4 are complete. Review reports/007_milestone_4_session_lifecycle.md before authorizing Milestone 5, the React library and recommendation interface. Frontend work remains unimplemented. The scoring policy is frozen; integration problems must be reported instead of silently changing it.

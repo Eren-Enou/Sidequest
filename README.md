@@ -4,7 +4,7 @@ A personal gaming session recommendation web application answering: **What shoul
 
 ## Current status
 
-Milestones 1-3 are complete: the frozen production scoring policy `v0.1-final-004`, synchronous SQLite persistence, the FastAPI game/goal library API, and a read-only recommendation endpoint. Session lifecycle endpoints and React remain pending. Milestone 4 requires a separate instruction.
+Milestones 1-4 are complete: frozen scoring policy `v0.1-final-004`, SQLite persistence, library/recommendation APIs, and the complete session lifecycle/history API. The application supports the full play-session loop through the API. React remains pending; Milestone 5 requires a separate instruction.
 
 ## Stack and layout
 
@@ -110,11 +110,56 @@ With the example game and goal above and no completed history, the request retur
 
 One query loads game/goal pairs and the latest completed session finish per game. Archived games and inactive goals are passed to the scorer for explicit exclusions; games without goals produce no candidate. Unfinished sessions do not affect recency. One backend timestamp is captured per evaluation. Requests never save a recommendation or modify library/history records. No schema migration is needed for Milestone 3.
 
+## Session lifecycle and history API
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| POST | /api/sessions/start | Re-evaluate and start an accepted choice; 201 |
+| GET | /api/sessions/active | Recover active session; 200 with JSON null if none |
+| POST | /api/sessions/{id}/finish | Record completion and optionally complete the goal |
+| GET | /api/sessions | Completed history, finish time descending then ID descending |
+| GET | /api/sessions/{id} | Retrieve an active or completed session; 404 if missing |
+
+Start body (use a game/goal pair in the current recommendation choices):
+
+```json
+{
+  "game_id": 1,
+  "goal_id": 1,
+  "situation": {
+    "available_minutes": 45,
+    "energy": "low",
+    "social_preference": "solo",
+    "desired_experience": "progression"
+  }
+}
+```
+
+Start recalculates using current persisted data and one backend timestamp. Any choice in `recommendations` is accepted, including a near-equivalent non-winner. Missing records return 404; mismatched pairs, active-session conflicts, and stale/unrecommendable choices return 409. A stale-choice response includes the refreshed recommendation and guidance to request a new one. Client scores, snapshots, and timestamps are rejected.
+
+Finish body:
+
+```json
+{
+  "actual_duration_minutes": 30,
+  "enjoyment_rating": 4,
+  "progress": "Harvested crops and built the shed",
+  "notes": "Save seeds for next time",
+  "mark_goal_completed": false
+}
+```
+
+Duration is a strict positive integer; enjoyment is 1-5; progress is required and trimmed to nonblank text. Notes are optional (omitted/null becomes null; an empty string is preserved). Goal completion defaults to false and is atomic with finish when requested. Already-finished sessions return 409, preserving the first result. Finish can record play after library archival; optional goal completion requires restoring archived game/goal records first. Impossible timestamp ordering returns 409; duration is user-confirmed and need not equal elapsed wall-clock minutes.
+
+Responses preserve snapshot titles, timestamps, finish fields, `situation_snapshot`, and a versioned `recommendation_snapshot`: `{snapshot_version: 1, selected: <scored choice>, evaluation: <full recommendation response>}`. Full factor inputs, explanations, policy version, and alternatives are saved at start. History reads saved evidence without recomputing scores or consulting current titles. Snapshots have no edit endpoint.
+
+SQLite `BEGIN IMMEDIATE` serializes lifecycle writers before validation; the existing partial unique index also enforces one active session. Active sessions and completed history survive restart. Finishing naturally updates later recommendation recency through the existing completed-session query. No new migration is needed.
+
 ## Migrations and local data
 
 `python -m app.migrate` applies pending numbered SQL files in one explicit SQLite transaction under a writer lock. `schema_migrations` records version, filename, normalized-content SHA-256, and applied UTC time. Running again is a no-op. Applied migrations are immutable: add the next numbered SQL file rather than editing the initial migration. Foreign keys are enabled on every application/migration connection. The runner refuses unknown future history and unversioned nonempty databases.
 
-This is a small forward-only runner, without autogeneration or downgrade commands. Stop the API and copy the SQLite file to back it up; restore a saved file only with compatible migration history. Personal databases are excluded from Git. Session tables exist for later milestones, but no session operations are exposed yet.
+This is a small forward-only runner, without autogeneration or downgrade commands. Stop the API and copy the SQLite file to back it up; restore a saved file only with compatible migration history. Personal databases are excluded from Git. Session operations use the existing PlaySession table and constraints.
 
 ## Verification and scoring example
 
@@ -125,9 +170,9 @@ From `backend/`:
 .venv/Scripts/python.exe -m examples.recommendation
 ```
 
-API tests migrate isolated temporary SQLite files and never use the personal database. Milestone 3 finished with 345 passing tests: all 315 previous tests and 30 new recommendation integration cases. The pure scoring module remains standard-library-only and unchanged. Its suitability gate, preference ranking, deterministic near ties, and four outcomes are documented in PROJECT.md and [report 004](reports/004_milestone_1_final_policy.md).
+API tests migrate isolated temporary SQLite files and never use the personal database. Milestone 4 finished with 410 passing tests: all 345 previous tests and 65 new session integration cases. The pure scoring module remains standard-library-only and unchanged. Its suitability gate, preference ranking, deterministic near ties, and four outcomes are documented in PROJECT.md and [report 004](reports/004_milestone_1_final_policy.md).
 
-See [report 005](reports/005_milestone_2_database_library_api.md) for persistence decisions and [report 006](reports/006_milestone_3_recommendation_api.md) for recommendation integration and validation evidence. Historical investigations remain in numbered immutable reports; the reports index records later outcomes without rewriting earlier evidence.
+See [report 005](reports/005_milestone_2_database_library_api.md) for persistence decisions, [report 006](reports/006_milestone_3_recommendation_api.md) for recommendation integration, and [report 007](reports/007_milestone_4_session_lifecycle.md) for lifecycle contracts and validation evidence. Historical investigations remain in numbered immutable reports; the reports index records later outcomes without rewriting earlier evidence.
 
 ## Future frontend setup
 

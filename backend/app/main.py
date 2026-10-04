@@ -1,4 +1,4 @@
-"""Local library/recommendation API; database migration is an explicit prerequisite."""
+"""Local library, recommendation, and session API; migration is explicit."""
 
 from contextlib import asynccontextmanager
 
@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import make_engine
 from app.migrate import require_current_schema
 from app.routes import router
+from app.session_routes import router as session_router
 
 
 def create_app(path=None):
@@ -27,6 +28,7 @@ def create_app(path=None):
     application.state.engine = engine
     application.state.sessions = sessionmaker(engine, expire_on_commit=False)
     application.include_router(router)
+    application.include_router(session_router)
 
     @application.exception_handler(IntegrityError)
     async def integrity_error(request: Request, error: IntegrityError):

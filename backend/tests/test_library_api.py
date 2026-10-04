@@ -461,6 +461,6 @@ def test_unversioned_database_refused(tmp_path):
 def test_scope_and_frozen_scoring(library):
     client,_,_=library
     paths=client.get("/openapi.json").json()["paths"]
-    assert all(path.startswith(("/api/games","/api/goals")) or path == "/api/recommendations" for path in paths)
+    assert all(path.startswith(("/api/games","/api/goals","/api/sessions")) or path == "/api/recommendations" for path in paths)
     source=Path(__file__).resolve().parents[1]/"app/scoring.py"
     assert hashlib.sha256(source.read_bytes()).hexdigest()=="b422d327741a4d269104db1a5769ed2122a92067e1be302dd39961932f6acc1a"
