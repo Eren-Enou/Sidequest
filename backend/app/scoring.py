@@ -2,6 +2,8 @@
 
 Callers supply the evaluation clock and the last completed play time per game.
 Scores are additive, unrounded points (not probabilities or percentages).
+Only time, energy, and experience determine suitability. All eligible scores
+remain inspectable; recommendation choices contain only suitable candidates.
 """
 
 from dataclasses import dataclass
@@ -250,7 +252,9 @@ def _score(candidate: Candidate, context: SessionContext, evaluated_at: datetime
 
 def recommend(candidates: Iterable[Candidate], context: SessionContext, *,
               evaluated_at: datetime, weights: ScoringWeights = DEFAULT_WEIGHTS) -> RecommendationResult:
-    """Rank by raw score descending, priority descending, goal ID then game ID ascending.
+    """Filter eligibility, gate suitability, then rank and group suitable choices.
+
+    Order: raw score descending, priority descending, goal ID then game ID ascending.
 
     Duplicate goal IDs are invalid. Input ordering never affects output. Future last-play
     timestamps are treated as just played. No implicit current-time lookup is performed.

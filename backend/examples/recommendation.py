@@ -28,8 +28,12 @@ if __name__ == "__main__":
     result = sample()
     print(json.dumps({
         "engine_version": result.engine_version,
+        "status": result.status,
+        "recommendations": [item.candidate.game_title for item in result.recommendations],
         "ranked": [{"game": item.candidate.game_title, "goal": item.candidate.goal_title,
                     "score": item.score, "breakdown": item.breakdown,
+                    "suitability": item.suitability, "suitable": item.suitable,
+                    "unsuitable_reasons": item.unsuitable_reasons,
                     "explanations": [{"factor": f.name, "weight": f.weight,
                                       "inputs": dict(f.inputs), "reason": f.reason}
                                      for f in item.factors]} for item in result.ranked],

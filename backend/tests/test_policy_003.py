@@ -8,11 +8,11 @@ from experiments.policy_003 import time_points, recommend
 from examples.evaluation_001 import EVALUATED_AT
 
 PROTECTED_HASHES = {
-    "backend/app/scoring.py": "e0bee04c7f81a53b1881a8777d689bd08bb337155fdf4675702af4fc4d7e87fe",
-    "backend/examples/evaluation_001.py": "b6a3b4635a643a0fc7428901dd0084e3ffc072edf82a007530d8e25ae5015ab7",
-    "backend/experiments/policy_002.py": "9e50f8e33c69cddc852e06229cc22291ca0c7329c40c1ecc586676ccfe3c28a4",
-    "backend/experiments/comparison_002.py": "01a3bd05472851578c6290614d8a2ef9f3299b65b97b6f81949a810fa87d5b3e",
-    "backend/tests/test_scoring.py": "6da8fc310ca49b924e457479025b94b712b6228afb4088373ccac0eaa86aa2e0",
+    "reports/003_duration_and_threshold_experiment.md": "e6f32387a0c3e2fc412d808b237d9f22f02fab4cba10d2a50660de37c08ef390",
+    "backend/experiments/baseline_001.py": "e0bee04c7f81a53b1881a8777d689bd08bb337155fdf4675702af4fc4d7e87fe",
+    "backend/examples/evaluation_001.py": "7c2005adb16dd941bef1afd724af86edfe36ee7f08e5e21e589e866d17fd3cb4",
+    "backend/experiments/policy_002.py": "e848f2705f7b4dfdb20d71823524d2bb463e66095af06bdd08f70802b2d91442",
+    "backend/experiments/comparison_002.py": "a3991aa81778de8dd584a8c71d1970772cb8af34ed97f1aaa4af241056d780d8",
     "backend/tests/test_policy_002.py": "dc1d9e94f25eda7f2ed085944cca0cb1ed02c43c0152c378b0798ba5c15db227",
     "reports/001_milestone_1_engine_evaluation.md": "321498eabc0741db9eac22988981bbc3e7ec948035369c732f0c1777b7b299bb",
     "reports/002_scoring_policy_experiment.md": "100799e3a6df1d49614a3321d84a5add048fcab5b6f327135ab3543d2596f7aa",

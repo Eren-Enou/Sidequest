@@ -8,7 +8,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 import json
 
-from app.scoring import Candidate, SessionContext, recommend
+from app.scoring import Candidate, SessionContext
+from experiments.baseline_001 import recommend
 
 EVALUATED_AT = datetime(2026, 10, 3, 19, tzinfo=timezone.utc)
 

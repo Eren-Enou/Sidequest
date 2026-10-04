@@ -1,35 +1,35 @@
 # Implementation plan
 
-Status: Milestone 1 implemented with user authorization. Milestones 2-6 remain proposed and await review.
+Status: Milestones 1-3 complete (reports 004-006). Milestones 4-6 remain unstarted and require further user direction.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
-## 1. Deterministic recommendation engine - implemented
+## 1. Deterministic recommendation engine - complete
 
 - Set up the Python dependency manifest and pytest.
 - Define lightweight typed candidate/situation/result structures and input validation.
-- Implement eligibility, eight score factors, stable tie handling, and structured explanations in a pure module.
+- Implement eligibility, seven score factors, suitability-only abstention, and near-equivalent recommendations, stable tie handling, and structured explanations in a pure module.
 - Add focused tests for boundaries, empty sets, incompatibility, ties, recency, and repeatability using a fixed evaluation time.
 
 Done when documented examples produce expected rankings and explanations without a database, web server, or external calls. This validates the product's central behavior before UI work.
 
-## 2. Database and library API
+## 2. Database and library API - complete
 
 - Add FastAPI, synchronous SQLAlchemy, SQLite foreign-key enforcement, and request/response schemas.
-- Create Game, Goal, and PlaySession tables with constraints and an explicit initial migration. Choose a small migration mechanism here and document its use.
+- Create Game, Goal, and PlaySession tables with constraints and an explicit initial migration. Implemented an explicit versioned SQL runner with transactional upgrades and normalized-content checksums; see README.md.
 - Implement game/goal create, list, edit, archive, and goal-completion routes.
 - Test validation, relationships, archive behavior, and data persistence using a temporary SQLite database.
 
-Done when the library can be managed through API calls and data survives reopening the database.
+Completed: games/goals can be managed through API calls, data survives reopening a file database, and all 315 tests pass. Report 005 records the schema, routes, and remaining limitations.
 
-## 3. Recommendation API
+## 3. Recommendation API - complete
 
 - Add a recommendation endpoint accepting the four situation inputs.
 - Load candidates and completed-session recency, evaluate at one backend timestamp, and call the scoring engine.
 - Return winner, ordered alternatives, factor calculations, version, and exclusions.
 - Test integration between persisted candidate/history data and the ranking result.
 
-Done when library records yield the documented explanation and empty sets return useful reasons.
+Completed: POST /api/recommendations maps persisted library/history into the frozen scorer once at one backend timestamp, preserving all four outcomes, choice ordering, factor explanations, exclusions, and unsuitable audit entries. All 345 tests pass (315 previous + 30 new). Requests are read-only and scoring.py matches the frozen SHA-256. Report 006 records the contract and evidence.
 
 ## 4. Session lifecycle and history API
 
@@ -62,4 +62,4 @@ Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
 ## First implementation recommendation
 
-Review the implemented engine and fictional sample before milestone 2. Confirm the interest/friction scales, hard filters, and scoring weights. Database, API, and frontend work remain unimplemented.
+Milestones 1-3 are complete. Review reports/006_milestone_3_recommendation_api.md before authorizing Milestone 4, session lifecycle and history. Session endpoints and frontend work remain unimplemented. The scoring policy is frozen; integration problems must be reported instead of silently changing it.

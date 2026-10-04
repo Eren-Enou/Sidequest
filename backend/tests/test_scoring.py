@@ -22,14 +22,15 @@ def test_obvious_winner():
     strong = replace(BASE, interest=5, goal_priority=3)
     result = run(weak, strong)
     assert result.winner.candidate == strong
-    assert result.winner.score == 100
-    assert result.ranked[1].score == 5
+    assert result.winner.score == 98
+    assert result.ranked[1].score == -5
+    assert not result.ranked[1].suitable
 
 
 def test_time_filter_and_exact_boundary():
     result = run(BASE, replace(BASE, goal_id=2, estimated_minutes=31))
     assert len(result.ranked) == 1
-    assert result.ranked[0].breakdown["time_fit"] == 15
+    assert result.ranked[0].breakdown["time_fit"] == 8
     assert result.excluded[0].reasons == ("Needs 31 minutes; only 30 available.",)
 
 
@@ -43,15 +44,15 @@ def test_social_compatibility(preference, mode, eligible):
     assert bool(result.ranked) == eligible
     assert bool(result.excluded) != eligible
     if eligible:
-        assert result.winner.breakdown["social_fit"] == 10
+        assert "social_fit" not in result.winner.breakdown
     else:
         assert "only" in result.excluded[0].reasons[0]
 
 
 @pytest.mark.parametrize("available,required,points", [
-    ("low", "low", 15), ("low", "medium", 7.5), ("low", "high", 0),
-    ("medium", "low", 15), ("medium", "medium", 15), ("medium", "high", 7.5),
-    ("high", "low", 15), ("high", "medium", 15), ("high", "high", 15),
+    ("low", "low", 30), ("low", "medium", 15), ("low", "high", 0),
+    ("medium", "low", 30), ("medium", "medium", 30), ("medium", "high", 15),
+    ("high", "low", 30), ("high", "medium", 30), ("high", "high", 30),
 ])
 def test_energy_boundaries(available, required, points):
     result = run(replace(BASE, energy_required=required), context=replace(CONTEXT, energy=available))
@@ -72,7 +73,7 @@ def test_experience_changes_winner():
 
 @pytest.mark.parametrize("field,low,high,difference", [
     ("interest", 1, 5, 25), ("goal_priority", 1, 3, 15),
-    ("estimated_minutes", 15, 30, 7.5), ("friction", 0, 5, -10),
+    ("estimated_minutes", 15, 30, -2), ("friction", 0, 5, -10),
 ])
 def test_factor_direction_and_range(field, low, high, difference):
     first = run(replace(BASE, **{field: low})).winner.score
@@ -80,7 +81,7 @@ def test_factor_direction_and_range(field, low, high, difference):
     assert second - first == difference
 
 
-@pytest.mark.parametrize("days,penalty", [(0, -10), (3.5, -5), (7, 0), (20, 0), (-1, -10)])
+@pytest.mark.parametrize("days,penalty", [(0, -3), (3.5, -1.5), (7, 0), (20, 0), (-1, -3)])
 def test_recent_play_window(days, penalty):
     candidate = replace(BASE, last_completed_session_at=NOW - timedelta(days=days))
     result = run(candidate)
@@ -174,13 +175,13 @@ def test_timezone_conversion_and_tag_normalization():
     local_candidate = replace(BASE, experience_tags=["progression", "chill", "chill"],
                               last_completed_session_at=local_now - timedelta(days=3.5))
     assert local_candidate.experience_tags == ("chill", "progression")
-    assert recommend([local_candidate], CONTEXT, evaluated_at=local_now).winner.breakdown["recent_play"] == -5
+    assert recommend([local_candidate], CONTEXT, evaluated_at=local_now).winner.breakdown["recent_play"] == -1.5
     assert recommend([BASE], CONTEXT, evaluated_at=local_now) == run(BASE)
 
 
 def test_fictional_example():
     result = sample()
     assert result.winner.candidate.game_title == "Moonlit Orchard"
-    assert result.winner.score == 85.5
+    assert result.winner.score == 90.5
     assert len(result.ranked) == 3
     assert result.excluded[0].candidate.game_title == "Starship Crew"
