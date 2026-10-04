@@ -36,6 +36,8 @@ def create_app(path=None):
 
     @application.exception_handler(OperationalError)
     async def operational_error(request: Request, error: OperationalError):
+        if engine.dialect.name == "postgresql":
+            return JSONResponse(status_code=503, content={"detail": "Database is unavailable; retry the request"})
         if "locked" in str(error.orig).lower():
             return JSONResponse(status_code=503, content={"detail": "Database is busy; retry the request"})
         raise error

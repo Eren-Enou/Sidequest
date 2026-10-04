@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Game, Goal, utcnow
+from app.database import serialize_postgresql_write
 from app.schemas import GameCreate, GamePatch, GameRead, GoalCreate, GoalPatch, GoalRead, GoalStatus, SQLITE_INTEGER_MAX
 from app.recommendations import evaluate
 from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, response_from_result
@@ -17,6 +18,8 @@ router = APIRouter(prefix="/api")
 
 def get_db(request: Request):
     with request.app.state.sessions() as db:
+        if request.method != "GET" and request.url.path != "/api/recommendations":
+            serialize_postgresql_write(db)
         yield db
 
 

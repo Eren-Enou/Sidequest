@@ -65,4 +65,21 @@ Completed: full active-session view, editable elapsed-duration suggestion, finis
 
 ## V0.1 completion decision
 
-V0.1 is complete. No further milestone, deployment, or V0.2 work has begun. Preserve the accepted scorer and immutable historical reports. Any later investigation or feature requires a separate user request and a new numbered report where applicable.
+V0.1 is complete. No further product milestone, actual deployment, or V0.2 work has begun. Preserve the accepted scorer and immutable historical reports. Authorized post-V0.1 deployment-enablement work is tracked separately below; any later investigation or feature requires a separate user request and a new numbered report where applicable.
+
+## Post-V0.1 deployment enablement
+
+Report 011 investigates the eventual Vercel/Neon architecture. Deployment Step 1
+adds portable database configuration and dialect-specific engine initialization,
+while retaining local SQLite as the default. At that stage PostgreSQL schema/lifecycle support,
+host configuration, authentication and actual deployment remained deferred. This is
+deployment-enablement work; V0.2 has not begun. See report 012 for the completed
+Step 1 verification and the proposed Step 2 scope.
+
+Deployment Step 2 is complete: synchronous Psycopg 3, separate immutable PostgreSQL
+SQL/checksum history, native constraints/JSON/UTC timestamps, and transaction-scoped
+advisory serialization preserve the existing contracts on real PostgreSQL 16.3.
+SQLite remains the local default. Report 013 records cross-dialect lifecycle,
+concurrency, rollback and full regression evidence. The next separately authorized
+step is production packaging/runtime compatibility (Deployment Step 3); do not
+deploy, create cloud resources, or begin V0.2.

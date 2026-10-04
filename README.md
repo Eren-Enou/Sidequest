@@ -51,6 +51,58 @@ $env:SIDEQUEST_DB_PATH = 'data/my-library.sqlite3'
 
 Alternatively migrate a named file using `python -m app.migrate --database PATH`; configure the API to use that same path. API startup checks the migration history and fails with setup guidance if migrations are missing or mismatched. It never auto-creates schema tables.
 
+### Portable database configuration (Deployment Steps 1–2)
+
+Local SQLite remains the normal/default configuration. With `DATABASE_URL` absent,
+the default path, `SIDEQUEST_DB_PATH`, and explicit `--database PATH` behavior are
+unchanged. PostgreSQL persistence is also supported and verified against a real
+isolated PostgreSQL 16.3 cluster; no cloud deployment exists.
+
+| Configuration | Result |
+| --- | --- |
+| Neither environment variable set | SQLite at `backend/data/sidequest.sqlite3` |
+| Only `SIDEQUEST_DB_PATH` set | SQLite at that path; relative paths use `backend/` |
+| Only `DATABASE_URL` set | Parse a SQLAlchemy URL and select its dialect |
+| Both variables present, even if empty | Fail with a configuration conflict |
+| `DATABASE_URL` plus an explicit SQLite path argument | Fail with a configuration conflict |
+
+An explicitly present empty or malformed `DATABASE_URL` is an error, not fallback
+to local SQLite. Configuration errors do not include the URL or its credentials.
+Supported URL families are synchronous `sqlite`/`sqlite+pysqlite` file URLs and
+`postgresql`/`postgresql+psycopg`/`postgresql+psycopg2`. The legacy `postgres` alias,
+other dialects, async drivers, in-memory SQLite URLs and SQLite URI mode are
+rejected. Relative SQLite URL file paths also resolve against `backend/`.
+
+SQLite continues creating the parent directory, enforcing foreign keys and using
+the existing explicit BEGIN/BEGIN IMMEDIATE hooks. PostgreSQL uses pinned
+`psycopg[binary]==3.3.6`; a bare `postgresql://` URL selects Psycopg 3, as does
+`postgresql+psycopg://`. Explicit `postgresql+psycopg2://` recognition is retained
+for compatibility, but that optional driver is not installed or verified here.
+
+Configure `DATABASE_URL` privately in your shell/environment, with
+`SIDEQUEST_DB_PATH` unset. From `backend/`, run `python -m app.migrate` explicitly
+before starting the API. The command selects `migrations/postgresql/` for
+PostgreSQL and the original `migrations/` for SQLite. Startup validates current
+checksummed history; it never upgrades schema. PostgreSQL writes serialize with
+a transaction-scoped application advisory lock and a database uniqueness
+constraint protects the single active session. UTC timestamps and original JSON
+snapshot numbers are preserved.
+
+Keep connection credentials out of source control, logs, frontend variables and
+shared shell transcripts. Connection/migration error messages omit connection
+URLs. Configure appropriate TLS/query options privately for any future host;
+host-specific pooling, packaging, authentication and deployment remain deferred.
+See [report 013](reports/013_deployment_postgresql_compatibility.md) for evidence.
+
+To run additional real PostgreSQL contracts, provide
+`SIDEQUEST_TEST_POSTGRES_URL` privately, pointing only to an isolated loopback
+PostgreSQL cluster with permission to create/drop disposable databases, then run
+`python -m pytest -q` from `backend/`. Each PostgreSQL case creates a uniquely
+named database and drops it afterward. Never point this setting at a personal or
+shared server. With this variable absent, PostgreSQL cases skip explicitly;
+ordinary SQLite checks still run. The test-only setting does not configure the
+application database. No Docker, cloud resources, or personal data are required.
+
 ## Library API
 
 | Method | Route | Behavior |
@@ -160,7 +212,7 @@ SQLite `BEGIN IMMEDIATE` serializes lifecycle writers before validation; the exi
 
 ## Migrations and local data
 
-`python -m app.migrate` applies pending numbered SQL files in one explicit SQLite transaction under a writer lock. `schema_migrations` records version, filename, normalized-content SHA-256, and applied UTC time. Running again is a no-op. Applied migrations are immutable: add the next numbered SQL file rather than editing the initial migration. Foreign keys are enabled on every application/migration connection. The runner refuses unknown future history and unversioned nonempty databases.
+`python -m app.migrate` applies pending numbered SQL files in one explicit transaction under a dialect-specific writer lock. `schema_migrations` records version, filename, normalized-content SHA-256, and applied UTC time. Running again is a no-op. Applied migrations are immutable: add the next numbered SQL file rather than editing the initial migration. SQLite foreign keys are enabled on every application/migration connection; PostgreSQL enforces native foreign keys. The runner refuses unknown future history and unversioned nonempty databases.
 
 This is a small forward-only runner, without autogeneration or downgrade commands. Stop the API and copy the SQLite file to back it up; restore a saved file only with compatible migration history. Personal databases are excluded from Git. Session operations use the existing PlaySession table and constraints.
 

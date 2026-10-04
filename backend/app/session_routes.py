@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import PlaySession, utcnow
+from app.database import serialize_postgresql_write
 from app.recommendations import evaluate
 from app.recommendation_schemas import response_from_result
 from app.routes import DB, RecordID, game_or_404, goal_or_404
@@ -32,9 +33,11 @@ def get_write_db(request: Request):
     # Set the flag before Session's first SQL statement begins the transaction.
     # SQLite serializes writers before we read/revalidate current library state.
     with request.app.state.engine.connect() as connection:
-        connection.info["begin_immediate"] = True
+        if connection.dialect.name == "sqlite":
+            connection.info["begin_immediate"] = True
         try:
             with Session(connection, expire_on_commit=False) as db:
+                serialize_postgresql_write(db)
                 yield db
         finally:
             connection.info.pop("begin_immediate", None)
