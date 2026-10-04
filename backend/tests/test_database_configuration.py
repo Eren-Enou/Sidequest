@@ -171,8 +171,8 @@ def test_external_application_startup_guard(monkeypatch, tmp_path):
 def test_local_startup_migrations_and_reopen(tmp_path):
     path = tmp_path / "startup.sqlite3"
     engine = database.make_engine(path)
-    assert upgrade(engine) == 1
-    assert upgrade(engine) == 1
+    assert upgrade(engine) == 2
+    assert upgrade(engine) == 2
     require_current_schema(engine)
     engine.dispose()
     with TestClient(create_app(path)) as client:
@@ -188,5 +188,5 @@ def test_sqlite_migration_cli(monkeypatch, tmp_path):
     for _ in range(2):
         result = subprocess.run([sys.executable, "-m", "app.migrate"], cwd=backend,
                                 env=environment, capture_output=True, text=True, check=True)
-        assert "Database at migration 001" in result.stdout
+        assert "Database at migration 002" in result.stdout
     assert (tmp_path / "cli.sqlite3").is_file()

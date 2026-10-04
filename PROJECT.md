@@ -65,9 +65,20 @@ All records have integer IDs. Store timestamps in UTC; display them in the brows
 | estimated_minutes | Positive estimate for a useful session on this goal, not total completion time |
 | priority | Integer 1–3; default 2 |
 | status | active, completed, or archived |
+| readiness | current (default) or later; independent from lifecycle and meaningful only while active |
 | created_at, updated_at, completed_at | Lifecycle timestamps |
 
 Energy, social mode, and experience tags belong to the game in V0.1; per-goal overrides are deferred. Goals can span multiple sessions. Marking a goal complete is explicit, never inferred from notes.
+
+Multiple active current goals may compete. Active later goals are saved plans and
+are excluded before scoring and new session starts; priority cannot unlock them.
+Restore/reopen returns completed/archived goals to active + current. Readiness
+changes do not invalidate active sessions or rewrite saved history. Migration
+002 defaults existing goals to current in both database dialects; old snapshot
+version 1 remains readable, and new sessions use version 2 with explicit
+`goal-readiness-020` eligibility metadata. Frozen scoring remains unchanged.
+See [Report 020](reports/020_optional_goal_readiness.md) for local verification;
+production deployment and migration require separate authorization.
 
 ### PlaySession
 

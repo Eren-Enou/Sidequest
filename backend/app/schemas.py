@@ -9,6 +9,7 @@ Energy = Literal["low", "medium", "high"]
 SocialMode = Literal["solo", "social", "both"]
 Experience = Literal["progression", "chill", "challenge", "novelty"]
 GoalStatus = Literal["active", "completed", "archived"]
+GoalReadiness = Literal["current", "later"]
 Title = Annotated[str, Field(min_length=1, max_length=200)]
 Interest = Annotated[int, Field(strict=True, ge=1, le=5)]
 Friction = Annotated[int, Field(strict=True, ge=0, le=5)]
@@ -74,6 +75,7 @@ class GoalCreate(LibraryModel):
     notes: str | None = None
     estimated_minutes: PositiveInt
     priority: Priority = 2
+    readiness: GoalReadiness = "current"
 
 
 class GoalPatch(PatchModel):
@@ -81,6 +83,7 @@ class GoalPatch(PatchModel):
     notes: str | None = None
     estimated_minutes: PositiveInt | None = None
     priority: Priority | None = None
+    readiness: GoalReadiness | None = None
 
 
 class GoalRead(GoalCreate):

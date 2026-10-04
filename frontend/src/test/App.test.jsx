@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import App from "../App.jsx";
@@ -508,6 +508,7 @@ describe("Library", () => {
     expect(sent("/api/goals", "POST")[0]).toEqual({
       game_id: 1,
       title: "Build a greenhouse",
+      readiness: "current",
       estimated_minutes: 20,
       priority: 3,
       notes: null,
@@ -531,7 +532,7 @@ describe("Library", () => {
     await library(user);
     await user.click(screen.getByRole("button", { name: "Complete goal" }));
     await screen.findByText("completed");
-    await user.click(screen.getByRole("button", { name: "Reopen goal" }));
+    await user.click(screen.getByRole("button", { name: "Reopen goal as current" }));
     await screen.findByText("active");
     expect(
       fetch.mock.calls.some(([url]) => url === "/api/goals/1/complete"),
@@ -542,7 +543,7 @@ describe("Library", () => {
     await library(user);
     await user.click(screen.getByRole("button", { name: "Archive goal" }));
     await screen.findByText("archived");
-    await user.click(screen.getByRole("button", { name: "Restore goal" }));
+    await user.click(screen.getByRole("button", { name: "Restore goal as current" }));
     await screen.findByText("active");
     expect(
       fetch.mock.calls.some(
@@ -660,5 +661,134 @@ describe("API failures", () => {
     await expect(request("/games")).rejects.toThrow(
       "Sidequest is unavailable or busy",
     );
+  });
+});
+
+
+describe("Goal readiness", () => {
+  it("groups multiple current goals separately from later", async () => {
+    goals = [
+      { ...goal, readiness: "current" },
+      { ...goal, id: 2, title: "Companion quest", readiness: "current" },
+      { ...goal, id: 3, title: "Future chapter", readiness: "later" },
+    ];
+    const user = await ready();
+    await library(user);
+    expect(within(screen.getByRole("region", { name: "Current goals" })).getAllByRole("article")).toHaveLength(2);
+    expect(within(screen.getByRole("region", { name: "Later" })).getByText("Future chapter")).toBeInTheDocument();
+  });
+  it("explains an all-later library without claiming it has no goals", async () => {
+    goals[0].readiness = "later";
+    const user = await ready();
+    await library(user);
+    expect(screen.getByText(/All active goals for this game are saved for later/)).toBeInTheDocument();
+    expect(screen.queryByText("No quests yet.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current goals" })).not.toBeInTheDocument();
+  });
+  it("distinguishes completed goals from all-later guidance", async () => {
+    goals[0].status = "completed";
+    const user = await ready();
+    await library(user);
+    expect(screen.getByText(/No current goals. Add a goal or reopen one as current/)).toBeInTheDocument();
+    expect(screen.queryByText(/All active goals/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen goal as current" })).toBeInTheDocument();
+  });
+  it("defaults creation to current but permits deliberate later", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Add goal", exact: true }));
+    expect(screen.getByLabelText("Goal readiness")).toHaveValue("current");
+    await user.selectOptions(screen.getByLabelText("Goal readiness"), "later");
+    await user.type(screen.getByLabelText("Goal title"), "Future story");
+    await user.click(screen.getByRole("button", { name: "Save goal" }));
+    await screen.findByRole("heading", { name: "Future story" });
+    expect(sent("/api/goals", "POST")[0].readiness).toBe("later");
+    expect(within(screen.getByRole("region", { name: "Later" })).getByText("Future story")).toBeInTheDocument();
+  });
+  it("moves a current goal to later explicitly", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Move to later" }));
+    await screen.findByRole("button", { name: "Make current" });
+    expect(sent("/api/goals/1", "PATCH")).toEqual([{ readiness: "later" }]);
+    expect(screen.getByRole("region", { name: "Later" })).toBeInTheDocument();
+  });
+  it("makes a later goal current explicitly", async () => {
+    goals[0].readiness = "later";
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Make current" }));
+    await screen.findByRole("button", { name: "Move to later" });
+    expect(sent("/api/goals/1", "PATCH")).toEqual([{ readiness: "current" }]);
+  });
+  it("metadata editing preserves the selected later readiness", async () => {
+    goals[0].readiness = "later";
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Edit goal", exact: true }));
+    expect(screen.getByLabelText("Goal readiness")).toHaveValue("later");
+    await user.type(screen.getByLabelText("Goal notes"), "Plan for tomorrow");
+    await user.click(screen.getByRole("button", { name: "Save goal" }));
+    await screen.findByRole("button", { name: "Make current" });
+    expect(sent("/api/goals/1", "PATCH")[0]).not.toHaveProperty("readiness");
+  });
+  it("failed readiness writes retain current UI and expose the error", async () => {
+    const user = await ready();
+    await library(user);
+    const original = fetch.getMockImplementation();
+    fetch.mockImplementation((url, options = {}) => url === "/api/goals/1" && options.method === "PATCH"
+      ? reply({ detail: "Readiness update failed" }, 409) : original(url, options));
+    await user.click(screen.getByRole("button", { name: "Move to later" }));
+    await screen.findByRole("alert");
+    expect(screen.getByText("Readiness update failed")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Current goals" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Later" })).not.toBeInTheDocument();
+  });
+  it("blocks duplicate readiness submissions while pending", async () => {
+    const user = await ready();
+    await library(user);
+    const original = fetch.getMockImplementation();
+    let resolve;
+    fetch.mockImplementation((url, options = {}) => url === "/api/goals/1" && options.method === "PATCH"
+      ? new Promise((done) => { resolve = done; }) : original(url, options));
+    await user.dblClick(screen.getByRole("button", { name: "Move to later" }));
+    expect(sent("/api/goals/1", "PATCH")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Move to later" })).toBeDisabled();
+    goals[0].readiness = "later";
+    await act(async () => resolve(await reply(goals[0])));
+    await screen.findByRole("button", { name: "Make current" });
+  });
+  it("ignores a late goal read after selecting another game", async () => {
+    games.push({ ...game, id: 2, title: "Clockwork Vale" });
+    const original = fetch.getMockImplementation();
+    let resolve;
+    fetch.mockImplementation((url, options) => {
+      if (url === "/api/goals?game_id=1&include_archived=true") return new Promise((done) => { resolve = done; });
+      if (url === "/api/goals?game_id=2&include_archived=true") return reply([{ ...goal, id: 2, game_id: 2, title: "Future expedition", readiness: "later" }]);
+      return original(url, options);
+    });
+    const user = await ready();
+    await user.click(screen.getByRole("button", { name: "Library", exact: true }));
+    await user.click(await screen.findByRole("button", { name: /Moonlit Orchard/ }));
+    await waitFor(() => expect(resolve).toBeDefined());
+    await user.click(screen.getByRole("button", { name: /Clockwork Vale/ }));
+    await screen.findByRole("heading", { name: "Future expedition" });
+    await act(async () => resolve(await reply([goal])));
+    expect(screen.queryByRole("heading", { name: "Harvest crops" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Later" })).toBeInTheDocument();
+  });
+  it("shows later exclusion evidence without a numeric score", async () => {
+    recommendation.status = "no_eligible";
+    recommendation.winner = null;
+    recommendation.recommendations = [];
+    recommendation.ranked = [];
+    recommendation.excluded = [{ candidate: choice.candidate, reasons: ["Goal is planned for later and is not currently considered."] }];
+    const user = await ready();
+    await user.click(screen.getByRole("button", { name: "Find my next quest" }));
+    await screen.findByText("No quest fits this session yet.");
+    await user.click(screen.getByText("Other quests: exclusions and fit details"));
+    expect(screen.getByText(/Goal is planned for later/)).toBeInTheDocument();
+    expect(screen.queryByText("Recommendation score")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Start/ })).not.toBeInTheDocument();
   });
 });

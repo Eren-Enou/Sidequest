@@ -52,8 +52,8 @@ def persistence(request, monkeypatch, tmp_path):
     try:
         with pytest.raises(RuntimeError, match="not migrated"):
             require_current_schema(engine)
-        assert upgrade(engine) == 1
-        assert upgrade(engine) == 1
+        assert upgrade(engine) == 2
+        assert upgrade(engine) == 2
         require_current_schema(engine)
         monkeypatch.setattr("app.routes.utcnow", lambda: NOW - timedelta(days=1))
         app = create_app(path)
@@ -171,6 +171,8 @@ def test_migration_history_and_wrong_stream(persistence, tmp_path):
     source = (POSTGRESQL_MIGRATION_DIR if pg else MIGRATION_DIR) / '001_initial.sql'
     folder = tmp_path / 'changed'
     folder.mkdir()
+    for path in source.parent.glob('[0-9][0-9][0-9]_*.sql'):
+        (folder / path.name).write_bytes(path.read_bytes())
     (folder / source.name).write_text(source.read_text() + '\n-- changed checksum\n')
     with pytest.raises(RuntimeError, match="history mismatch"):
         upgrade(engine, folder)
@@ -185,9 +187,10 @@ def test_migration_failure_rollback(persistence, tmp_path):
     source = (POSTGRESQL_MIGRATION_DIR if engine.dialect.name == 'postgresql' else MIGRATION_DIR) / '001_initial.sql'
     folder = tmp_path / 'rollback'
     folder.mkdir()
-    (folder / source.name).write_text(source.read_text())
+    for path in source.parent.glob('[0-9][0-9][0-9]_*.sql'):
+        (folder / path.name).write_bytes(path.read_bytes())
     prefix = '-- sidequest-dialect: postgresql\n' if engine.dialect.name == 'postgresql' else ''
-    (folder / '002_failure.sql').write_text(prefix + 'CREATE TABLE must_rollback(id INTEGER);\nSELECT * FROM absent_table;\n')
+    (folder / '003_failure.sql').write_text(prefix + 'CREATE TABLE must_rollback(id INTEGER);\nSELECT * FROM absent_table;\n')
     from sqlalchemy.exc import SQLAlchemyError
     with pytest.raises(SQLAlchemyError):
         upgrade(engine, folder)
@@ -226,7 +229,7 @@ def test_explicit_cli_and_startup_guard(persistence):
     result = subprocess.run([sys.executable, "-m", "app.migrate"],
                             capture_output=True, text=True)
     assert result.returncode == 0, "Migration CLI failed (connection details withheld)"
-    assert result.stdout.strip() == "Database at migration 001"
+    assert result.stdout.strip() == "Database at migration 002"
     with engine.begin() as connection:
         connection.exec_driver_sql("DELETE FROM schema_migrations")
     with pytest.raises(RuntimeError, match="not migrated"):

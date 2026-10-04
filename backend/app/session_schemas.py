@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, ScoredCandidateRead
+from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, ReadinessRecommendationResponse, ScoredCandidateRead
 from app.schemas import PositiveInt
 
 # Projection coerces mixed integer/float factors to floats. Allow representation
@@ -64,6 +64,12 @@ class RecommendationSnapshot(BaseModel):
         return self
 
 
+class ReadinessRecommendationSnapshot(RecommendationSnapshot):
+    """New evidence explicitly records the readiness eligibility contract."""
+    snapshot_version: Literal[2]
+    evaluation: ReadinessRecommendationResponse
+
+
 class SessionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -78,7 +84,8 @@ class SessionRead(BaseModel):
     progress: str | None
     notes: str | None
     situation_snapshot: RecommendationRequest
-    recommendation_snapshot: RecommendationSnapshot
+    recommendation_snapshot: Annotated[RecommendationSnapshot | ReadinessRecommendationSnapshot,
+                                       Field(discriminator="snapshot_version")]
 
     @model_validator(mode="after")
     def consistent_session(self):

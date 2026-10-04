@@ -138,6 +138,30 @@ application database. No Docker, cloud resources, or personal data are required.
 
 Default goal lists exclude archived goals and goals of archived games; completed goals remain visible unless filtered. To query archived status, also pass `include_archived=true`. Archiving a game preserves each goal's status. Direct retrieval and metadata edits still work for archived records. Restore the parent game before creating/restoring/completing its goals. Repeated archive/restore/completion requests are idempotent for the existing state.
 
+Active goals now also have independent **readiness**: `current` (default) or
+`later`. Several goals per game may be current. Later goals are saved plans and
+are excluded before scoring and new session starts; priority does not unlock
+them. POST `/api/goals` may include readiness; PATCH `/api/goals/{id}` explicitly
+moves active goals between current/later. Omitting readiness on PATCH preserves
+it. Completed/archived goals retain lifecycle meaning; restore/reopen returns
+them to active + current. Completion never promotes another goal.
+
+Run the existing explicit `python -m app.migrate` workflow before starting this
+version: migration **002_goal_readiness.sql** exists for SQLite and PostgreSQL.
+It adds a non-null constrained field, defaults every existing goal to current,
+and preserves IDs, timestamps and saved sessions. No automatic startup migration
+is performed. Production migration/deployment requires separate authorization.
+See [Report 020](reports/020_optional_goal_readiness.md).
+
+Library separates Current, Later, Completed and Archived goals. Use “Move to
+later” or “Make current”; an all-later library explains how to become actionable.
+Tonight shows later goals in the unscored exclusion audit. Recommendation
+responses identify `eligibility_version=goal-readiness-020`; calculations still
+use frozen `v0.1-final-004`. Newly started sessions save snapshot version 2 with
+that eligibility marker. Version-1 history remains readable without backfill or
+live-readiness inference, and an already active session stays finishable after
+its goal is moved later. Outcome Insights retain their descriptive meaning.
+
 Titles are trimmed, experience tags are validated and canonicalized, integer ranges are strict, and unknown fields are rejected. PATCH omits unchanged fields; `notes: null` clears notes. Other writable fields cannot be explicitly null. Goal game_id is immutable after creation, preserving session relationships. Lifecycle fields and timestamps are server-owned. Validation errors return 422, missing records 404, relationship/state conflicts 409, and a busy SQLite writer 503. DELETE is always soft archive.
 
 Example game body:

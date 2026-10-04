@@ -11,7 +11,7 @@ from app.database import serialize_postgresql_write
 from app.recommendations import evaluate
 from app.recommendation_schemas import response_from_result
 from app.routes import DB, RecordID, game_or_404, goal_or_404
-from app.session_schemas import RecommendationSnapshot, SessionFinish, SessionRead, SessionStart
+from app.session_schemas import ReadinessRecommendationSnapshot, SessionFinish, SessionRead, SessionStart
 
 router = APIRouter(prefix="/api/sessions")
 
@@ -65,7 +65,7 @@ def start_session(body: SessionStart, db: WriteDB, timestamp: Clock):
     if selected is None:
         raise HTTPException(409, {"message": "Selected pair is no longer a recommendation choice; request a new recommendation",
                                   "recommendation": response.model_dump(mode="json")})
-    snapshot = RecommendationSnapshot(snapshot_version=1, selected=selected, evaluation=response)
+    snapshot = ReadinessRecommendationSnapshot(snapshot_version=2, selected=selected, evaluation=response)
     row = PlaySession(game_id=game.id, goal_id=goal.id, game_title_snapshot=game.title,
                       goal_title_snapshot=goal.title, started_at=timestamp,
                       situation_snapshot=body.situation.model_dump(mode="json"),

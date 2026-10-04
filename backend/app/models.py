@@ -66,6 +66,7 @@ class Goal(Base):
     estimated_minutes: Mapped[int] = mapped_column(ID_TYPE)
     priority: Mapped[int] = mapped_column(default=2)
     status: Mapped[str] = mapped_column(String(9), default="active")
+    readiness: Mapped[str] = mapped_column(String(7), default="current", server_default="current")
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

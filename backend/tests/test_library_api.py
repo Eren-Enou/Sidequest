@@ -375,12 +375,12 @@ def test_migrations_explicit_idempotent_and_required(tmp_path):
     engine = make_engine(tmp_path/"empty.sqlite3")
     with pytest.raises(RuntimeError,match="not migrated"):
         require_current_schema(engine)
-    assert upgrade(engine) == 1
-    assert upgrade(engine) == 1
+    assert upgrade(engine) == 2
+    assert upgrade(engine) == 2
     require_current_schema(engine)
     assert {"games","goals","play_sessions","schema_migrations"} == set(inspect(engine).get_table_names())
     with engine.connect() as conn:
-        assert conn.exec_driver_sql("SELECT count(*) FROM schema_migrations").scalar() == 1
+        assert conn.exec_driver_sql("SELECT count(*) FROM schema_migrations").scalar() == 2
     engine.dispose()
     with pytest.raises(RuntimeError,match="not migrated"):
         with TestClient(create_app(tmp_path/"unmigrated.sqlite3")):
@@ -391,6 +391,8 @@ def test_migration_checksum_detects_changes(library,tmp_path):
     _,engine,_=library
     folder=tmp_path/"migrations"
     folder.mkdir()
+    for path in MIGRATION_DIR.glob("[0-9][0-9][0-9]_*.sql"):
+        (folder/path.name).write_bytes(path.read_bytes())
     source=(MIGRATION_DIR/"001_initial.sql").read_text(encoding="utf-8")
     (folder/"001_initial.sql").write_text(source+"\n-- Edited historical migration\n",encoding="utf-8")
     with pytest.raises(RuntimeError,match="history mismatch"):
@@ -401,15 +403,17 @@ def test_migration_checksum_is_portable_across_line_endings(library,tmp_path):
     _,engine,_=library
     folder=tmp_path/"migrations"
     folder.mkdir()
+    for path in MIGRATION_DIR.glob("[0-9][0-9][0-9]_*.sql"):
+        (folder/path.name).write_bytes(path.read_bytes())
     source=(MIGRATION_DIR/"001_initial.sql").read_text(encoding="utf-8")
     (folder/"001_initial.sql").write_bytes(source.replace("\n","\r\n").encode("utf-8"))
-    assert upgrade(engine,folder)==1
+    assert upgrade(engine,folder)==2
 
 
 def test_future_revision_refused(library):
     _,engine,_=library
     with engine.begin() as conn:
-        conn.exec_driver_sql("INSERT INTO schema_migrations VALUES (2, '002_unknown.sql', 'unknown', '2026-10-03T00:00:00Z')")
+        conn.exec_driver_sql("INSERT INTO schema_migrations VALUES (3, '003_unknown.sql', 'unknown', '2026-10-03T00:00:00Z')")
     with pytest.raises(RuntimeError,match="newer"):
         require_current_schema(engine)
     with pytest.raises(RuntimeError,match="newer"):
@@ -434,8 +438,9 @@ def test_failed_migration_rolls_back_ddl_and_revision(tmp_path,previously_migrat
         upgrade(engine)
     folder=tmp_path/"migrations"
     folder.mkdir()
-    (folder/"001_initial.sql").write_bytes((MIGRATION_DIR/"001_initial.sql").read_bytes())
-    (folder/"002_broken.sql").write_text("CREATE TABLE partial_write (id INTEGER);\nINVALID SQL;\n",encoding="utf-8")
+    for path in MIGRATION_DIR.glob("[0-9][0-9][0-9]_*.sql"):
+        (folder/path.name).write_bytes(path.read_bytes())
+    (folder/"003_broken.sql").write_text("CREATE TABLE partial_write (id INTEGER);\nINVALID SQL;\n",encoding="utf-8")
     from sqlalchemy.exc import OperationalError
     with pytest.raises(OperationalError):
         upgrade(engine,folder)
@@ -443,7 +448,7 @@ def test_failed_migration_rolls_back_ddl_and_revision(tmp_path,previously_migrat
     assert "partial_write" not in tables
     if previously_migrated:
         with engine.connect() as conn:
-            assert conn.exec_driver_sql("SELECT count(*) FROM schema_migrations").scalar()==1
+            assert conn.exec_driver_sql("SELECT count(*) FROM schema_migrations").scalar()==2
     else:
         assert tables == set()
     engine.dispose()

@@ -124,7 +124,7 @@ def test_packaged_import_identity_resources_no_writes(tmp_path):
             "from app.migrate import stream; "
             "assert index.app is app.main.app; "
             "assert index.app.state.engine.dialect.name=='postgresql'; "
-            "files=stream(index.app.state.engine); assert len(files)==1 and files[0].is_absolute(); "
+            "files=stream(index.app.state.engine); assert len(files)==2 and all(p.is_absolute() for p in files); "
             "assert files[0].read_text().startswith('-- sidequest-dialect: postgresql'); "
             "from sqlalchemy.pool import NullPool; assert isinstance(index.app.state.engine.pool, NullPool); "
             "index.app.state.engine.dispose()")

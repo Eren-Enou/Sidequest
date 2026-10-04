@@ -15,7 +15,7 @@ from app.main import create_app
 from app.models import PlaySession
 from app.routes import get_evaluation_time
 from app.session_routes import get_operation_time
-from app.session_schemas import RecommendationSnapshot
+from app.session_schemas import ReadinessRecommendationSnapshot
 from test_library_api import library, seed, NOW, session_row
 from test_recommendation_api import CONTEXT, add
 
@@ -57,7 +57,7 @@ def test_full_loop_snapshot_and_recency(lifecycle):
     assert response.status_code == 201, response.text
     row = response.json()
     assert row["started_at"] == "2026-10-03T19:00:00Z"
-    assert row["recommendation_snapshot"]["snapshot_version"] == 1
+    assert row["recommendation_snapshot"]["snapshot_version"] == 2
     assert row["recommendation_snapshot"]["evaluation"] == before
     assert row["recommendation_snapshot"]["selected"] == before["winner"]
     assert client.get("/api/sessions/active").json() == row
@@ -261,7 +261,7 @@ def test_snapshot_validation(lifecycle, corruption):
     if corruption == "factor": snapshot["evaluation"]["ranked"][0]["factors"][0]["points"] += 1
     if corruption == "context": del snapshot["evaluation"]["context"]["energy"]
     if corruption == "timestamp": snapshot["evaluation"]["evaluated_at"] = "2026-10-03T19:00:00"
-    with pytest.raises(ValidationError): RecommendationSnapshot.model_validate(snapshot)
+    with pytest.raises(ValidationError): ReadinessRecommendationSnapshot.model_validate(snapshot)
 
 
 @pytest.mark.parametrize("operation", ["start", "finish"])

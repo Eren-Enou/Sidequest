@@ -159,20 +159,22 @@ export function GameForm({ game, onSave, onCancel, busy }) {
 export function GoalForm({ goal, gameId, onSave, onCancel, busy }) {
   const [values, setValues] = useState(
     goal
-      ? { ...goal }
-      : { title: "", estimated_minutes: 30, priority: 2, notes: "" },
+      ? { readiness: "current", ...goal }
+      : { title: "", estimated_minutes: 30, priority: 2, notes: "", readiness: "current" },
   );
   const change = (key, value) =>
     setValues((previous) => ({ ...previous, [key]: value }));
   function submit(event) {
     event.preventDefault();
-    const { title, estimated_minutes, priority, notes } = values;
+    const { title, estimated_minutes, priority, notes, readiness } = values;
     onSave(
       {
         title,
         estimated_minutes,
         priority,
         notes: notes || null,
+        ...(!goal || (goal.status === "active" && readiness !== (goal.readiness ?? "current"))
+          ? { readiness } : {}),
         ...(!goal ? { game_id: gameId } : {}),
       },
       goal?.id,
@@ -186,6 +188,17 @@ export function GoalForm({ goal, gameId, onSave, onCancel, busy }) {
     >
       <h3>{goal ? "Edit quest" : "Add a quest"}</h3>
       <fieldset disabled={busy}>
+        {(!goal || goal.status === "active") && (
+          <SelectField
+            label="Goal readiness"
+            value={values.readiness}
+            onChange={(v) => change("readiness", v)}
+            options={[
+              ["current", "Current · Ready to consider"],
+              ["later", "Later · Saved for the future"],
+            ]}
+          />
+        )}
         <Field label="Goal title">
           <input
             required

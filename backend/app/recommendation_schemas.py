@@ -75,6 +75,11 @@ class RecommendationResponse(ReadModel):
     excluded: list[ExcludedCandidateRead]
 
 
+class ReadinessRecommendationResponse(RecommendationResponse):
+    """Current API contract; old snapshots keep RecommendationResponse unchanged."""
+    eligibility_version: Literal["goal-readiness-020"]
+
+
 JSON_INPUTS = TypeAdapter(dict[str, Any])
 
 
@@ -88,11 +93,12 @@ def scored_response(item: ScoredCandidate) -> ScoredCandidateRead:
                  for f in item.factors])
 
 
-def response_from_result(result: RecommendationResult, context: RecommendationRequest) -> RecommendationResponse:
+def response_from_result(result: RecommendationResult, context: RecommendationRequest) -> ReadinessRecommendationResponse:
     # Projection only: no ranking, acceptance, status inference, or arithmetic here.
     ranked = [scored_response(item) for item in result.ranked]
     by_goal = {item.candidate.goal_id: item for item in ranked}
-    return RecommendationResponse(
+    return ReadinessRecommendationResponse(
+        eligibility_version="goal-readiness-020",
         status=result.status, engine_version=result.engine_version, evaluated_at=result.evaluated_at,
         context=context, weights=vars(result.weights), minimum_suitability=result.minimum_suitability,
         near_tie_margin=result.near_tie_margin,

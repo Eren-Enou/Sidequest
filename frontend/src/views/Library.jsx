@@ -108,6 +108,20 @@ export default function Library() {
         setGoalEditor(null);
       },
     );
+  const changeReadiness = (goal) =>
+    mutate(
+      () => api.saveGoal({ readiness: goal.readiness === "later" ? "current" : "later" }, goal.id),
+      async () => {
+        setGoals(await api.goals(selected));
+        setGoalEditor(null);
+      },
+    );
+  const groups = [
+    ["Current goals", goals.filter((goal) => goal.status === "active" && goal.readiness !== "later")],
+    ["Later", goals.filter((goal) => goal.status === "active" && goal.readiness === "later")],
+    ["Completed", goals.filter((goal) => goal.status === "completed")],
+    ["Archived", goals.filter((goal) => goal.status === "archived")],
+  ];
   const visible = games.filter((item) => showArchived || !item.archived_at);
   async function retryLibrary() {
     await loadGames();
@@ -290,11 +304,24 @@ export default function Library() {
                   <h3>No quests yet.</h3>
                   <p>
                     Add a goal you can make progress on during a session. A game
-                    needs an active goal to be recommended.
+                    needs a current active goal to be considered.
                   </p>
                 </div>
               ) : (
-                goals.map((goal) => (
+                <>
+                {groups[0][1].length === 0 && !game.archived_at && (
+                  <p className="notice">
+                    {groups[1][1].length > 0
+                      ? "All active goals for this game are saved for later. Make one current when you're ready to work on it."
+                      : "No current goals. Add a goal or reopen one as current when you're ready."}
+                  </p>
+                )}
+                {groups.map(([label, rows]) => rows.length > 0 && (
+                  <section key={label} aria-label={label}>
+                    <h3>{label}</h3>
+                    {label === "Current goals" && <p className="quiet">Ready to consider for a session. You can have several current goals.</p>}
+                    {label === "Later" && <p className="quiet">Saved for the future and not considered for recommendations yet.</p>}
+                    {rows.map((goal) => (
                   <article className="goal-card" key={goal.id}>
                     <div className="section-head">
                       <h3>{goal.title}</h3>
@@ -317,6 +344,11 @@ export default function Library() {
                         Edit goal
                       </button>
                       {goal.status === "active" && (
+                        <button disabled={busy} onClick={() => changeReadiness(goal)}>
+                          {goal.readiness === "later" ? "Make current" : "Move to later"}
+                        </button>
+                      )}
+                      {goal.status === "active" && (
                         <button
                           disabled={busy || Boolean(game.archived_at)}
                           onClick={() => goalAction(goal.id, "complete")}
@@ -338,13 +370,16 @@ export default function Library() {
                           onClick={() => goalAction(goal.id, "restore")}
                         >
                           {goal.status === "completed"
-                            ? "Reopen goal"
-                            : "Restore goal"}
+                            ? "Reopen goal as current"
+                            : "Restore goal as current"}
                         </button>
                       )}
                     </div>
                   </article>
-                ))
+                    ))}
+                  </section>
+                ))}
+                </>
               )}
             </>
           )}

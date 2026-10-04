@@ -49,7 +49,7 @@ export default function Recommendation({ result, selectedId, onSelect }) {
           library and show you how it fits.
         </p>
         <p className="quiet">
-          Each game needs an active goal to be recommended.
+          Each game needs a current active goal to be considered.
         </p>
       </div>
     );
@@ -85,7 +85,8 @@ export default function Recommendation({ result, selectedId, onSelect }) {
       {result.status === "no_eligible" && (
         <p>
           Nothing can currently be recommended. Try more time, a different
-          social preference, or add an active goal to a game in your library.
+          social preference, or review current goals in your library. Goals saved
+          for later must be made current before they can be considered.
         </p>
       )}
       {accepted && (

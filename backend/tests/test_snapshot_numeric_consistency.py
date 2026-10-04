@@ -45,7 +45,7 @@ def response(desired="challenge", equivalent=False):
 def payload(result=None):
     result = result or response()
     return dict(snapshot_version=1, selected=result.winner.model_dump(mode="json"),
-                evaluation=result.model_dump(mode="json"))
+                evaluation=result.model_dump(mode="json", exclude={"eligibility_version"}))
 
 
 def change_score(data, goal_id, value):

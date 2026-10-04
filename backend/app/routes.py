@@ -11,7 +11,7 @@ from app.models import Game, Goal, utcnow
 from app.database import serialize_postgresql_write
 from app.schemas import GameCreate, GamePatch, GameRead, GoalCreate, GoalPatch, GoalRead, GoalStatus, SQLITE_INTEGER_MAX
 from app.recommendations import evaluate
-from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, response_from_result
+from app.recommendation_schemas import RecommendationRequest, ReadinessRecommendationResponse, response_from_result
 from app.outcome_schemas import GameOutcomes
 from app.outcomes import summarize_game
 
@@ -34,7 +34,7 @@ def get_evaluation_time() -> datetime:
     return utcnow()
 
 
-@router.post("/recommendations", response_model=RecommendationResponse)
+@router.post("/recommendations", response_model=ReadinessRecommendationResponse)
 def recommendation(body: RecommendationRequest, db: DB,
                    evaluated_at: Annotated[datetime, Depends(get_evaluation_time)]):
     result = evaluate(db, body, evaluated_at=evaluated_at)
@@ -150,6 +150,8 @@ def get_goal(goal_id: RecordID, db: DB):
 def edit_goal(goal_id: RecordID, body: GoalPatch, db: DB):
     goal = goal_or_404(db, goal_id)
     changes = body.model_dump(exclude_unset=True)
+    if "readiness" in changes and goal.status != "active":
+        raise HTTPException(409, "Restore or reopen the goal as current before changing readiness")
     if changes:
         for name, value in changes.items():
             setattr(goal, name, value)
@@ -187,6 +189,7 @@ def restore_goal(goal_id: RecordID, db: DB):
         raise HTTPException(409, "Restore the game before restoring the goal")
     if goal.status != "active":
         goal.status = "active"
+        goal.readiness = "current"
         goal.completed_at = None
         goal.updated_at = utcnow()
         return save(db, goal)
