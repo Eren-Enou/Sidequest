@@ -5,4 +5,7 @@ from app.database import database_configuration
 if database_configuration().dialect != "postgresql":
     raise RuntimeError("Production entrypoint requires a PostgreSQL DATABASE_URL")
 
+from app.security import allowed_origins
+allowed_origins(required=True)
+
 from app.main import app  # noqa: E402,F401 -- reuse the canonical application

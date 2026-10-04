@@ -8,12 +8,14 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from app.database import make_engine
+from app.security import allowed_origins, install_origin_guard
 from app.migrate import require_current_schema
 from app.routes import router
 from app.session_routes import router as session_router
 
 
 def create_app(path=None):
+    allowed = allowed_origins()
     engine = make_engine(path)
 
     @asynccontextmanager
@@ -25,6 +27,7 @@ def create_app(path=None):
             engine.dispose()
 
     application = FastAPI(title="Sidequest API", version="0.1", lifespan=lifespan)
+    install_origin_guard(application, allowed)
     application.state.engine = engine
     application.state.sessions = sessionmaker(engine, expire_on_commit=False)
     application.include_router(router)

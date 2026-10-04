@@ -304,7 +304,7 @@ local Uvicorn and Vite proxy commands above are unchanged and require no Vercel
 CLI. `app.main:app` continues to support local SQLite; `index:app` is specifically
 the production PostgreSQL entrypoint.
 
-Eventually configure backend-only `DATABASE_URL` privately, with
+Eventually configure application/backend-consumed `DATABASE_URL` privately, with
 `SIDEQUEST_DB_PATH` absent. Set `SIDEQUEST_POSTGRES_POOL=null` for the production
 runtime to avoid retaining idle connections across process freezes/reuse.
 Absent this setting, local PostgreSQL keeps its original QueuePool; SQLite is
@@ -330,3 +330,37 @@ or add application authentication. Services is currently beta; plan/account supp
 actual Vercel routing/lifespan/bundles, hosted TLS and cold-start behavior must still
 be verified during authorized staging. Local structural tests and Linux wheel
 resolution are not an actual Vercel runtime test. See [report 014](reports/014_deployment_production_packaging.md).
+
+## Security, transfer and recovery preparation (Deployment Step 4)
+
+Read [DEPLOYMENT.md](DEPLOYMENT.md) before any hosted work. It defines owner-only
+All Deployments protection, the bypass audit, private configuration, SQLite
+transfer, dated logical backups, tested restore, disaster recovery and future
+live acceptance checks. Current Vercel Services shares project environment
+variables with builds: the database URL is consumed only by the backend and is
+never a Vite/client variable, but service-level build isolation is not claimed.
+
+Production `index:app` now also requires `SIDEQUEST_ALLOWED_ORIGINS`, an exact
+comma-separated HTTPS origin allowlist. Unsafe requests require an allowed
+Origin or, when absent, an allowed Referer. This is a narrow CSRF safeguard;
+Vercel Authentication remains the access boundary. Local commands need no new
+configuration when this variable is absent. Minimal response headers prevent
+framing/MIME sniffing and referrer leakage; no CSP or CORS was introduced.
+
+From `backend/`, the explicit maintenance entrypoint is
+`python -m app.maintenance {transfer,backup,restore} --help` (select one command).
+It requires a privately configured `SIDEQUEST_MAINTENANCE_DATABASE_URL` and never
+falls back to the runtime URL. Transfer needs a read-only SQLite source and an
+already-migrated empty PostgreSQL destination; use `--dry-run` first. A full dump
+restore instead needs a completely empty, **unmigrated** PostgreSQL destination.
+Backups require pg_dump/pg_restore and an existing directory outside this repo.
+See the runbook for exact commands and precautions; do not use personal data
+without separate authorization.
+
+Step 4 verification: **598 backend passed, two intentional skips**, including
+the existing 33 PostgreSQL cases and 15 new real PostgreSQL maintenance cases;
+**51 frontend passed**, production build and private-sentinel artifact scan
+passed. The real PostgreSQL 16.3 dump/restore round trip recovered the fictional
+library, history, snapshots and active session, then supported new writes and
+session completion. See [report 015](reports/015_deployment_security_backup_preparation.md).
+No cloud resources, deployment or personal-data transfer occurred.

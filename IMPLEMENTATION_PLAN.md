@@ -94,3 +94,21 @@ beta availability/protection must be checked on the eventual account before stag
 Next separately authorized task: Deployment Step 4 only, security and backup
 acceptance procedures and any necessary safeguards, using local verification;
 do not create cloud resources, deploy, or begin V0.2.
+
+Deployment Step 4 is complete as preparation only: current owner-only Vercel
+All Deployments protection is documented with access/bypass audits, an explicit
+production origin guard and minimal headers. Conservative SQLite transfer and
+owner-initiated PostgreSQL backup/empty-database restore are verified against
+real isolated PostgreSQL 16.3 and the actual application. Report 015 and
+DEPLOYMENT.md contain evidence, recovery procedures, the ordered first-deployment
+runbook and all pending live acceptance checks. Full regression: 598 backend
+passed, two intentional skips; 51 frontend passed and production build passed.
+Scorer, both initial migrations and reports 001–014 remain unchanged.
+
+Next action requires separate authorization: create empty protected Neon/Vercel
+staging resources for fictional data, accounting for Git import's automatic
+deployment behavior and establishing All Deployments protection beforehand.
+Actual deployment, hosted acceptance, personal-data transfer and V0.2 are not
+authorized by this preparation. Services shared build environment variables
+are a documented boundary limitation; private values must never enter client
+artifacts or untrusted builds. Do not begin the next step automatically.

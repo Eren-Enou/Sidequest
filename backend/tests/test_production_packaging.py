@@ -58,6 +58,7 @@ def packaged_process(tmp_path, url, code):
     if url:
         env["DATABASE_URL"] = url
     env["SIDEQUEST_POSTGRES_POOL"] = "null"
+    env["SIDEQUEST_ALLOWED_ORIGINS"] = "https://sidequest.example"
     source = "import sys; sys.dont_write_bytecode=True; sys.path.insert(0, " + repr(str(destination)) + ");\n" + code
     result = subprocess.run([sys.executable, "-I", "-c", source], cwd=cwd, env=env,
                             capture_output=True, text=True)

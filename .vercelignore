@@ -9,3 +9,5 @@ backend/data/**
 **/*.db
 reports/**
 .git/**
+**/*.dump
+**/*.dump.*
