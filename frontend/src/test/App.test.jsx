@@ -1,75 +1,636 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import App from '../App.jsx';
-import { request } from '../api.js';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
+import userEvent from "@testing-library/user-event";
+import App from "../App.jsx";
+import { request } from "../api.js";
 
-const game = {id:1,title:'Moonlit Orchard',current_interest:4,friction:1,energy_required:'low',social_mode:'solo',experience_tags:['chill','progression'],notes:'Bring seeds',archived_at:null};
-const goal = {id:1,game_id:1,title:'Harvest crops',estimated_minutes:30,priority:2,notes:null,status:'active'};
-const context = {available_minutes:45,energy:'medium',social_preference:'either',desired_experience:'progression'};
-const breakdown = {interest:18.75,goal_priority:7.5,time_fit:10,energy_fit:30,experience_fit:20,friction:-2,recent_play:0};
-const choice = {candidate:{game_id:1,goal_id:1,game_title:game.title,goal_title:goal.title,estimated_minutes:30,energy_required:'low',social_mode:'solo'},score:84.25,suitability:60,suitable:true,unsuitable_reasons:[],breakdown,
-  factors:Object.entries(breakdown).map(([name,points]) => ({name,points,weight:10,inputs:{value:1},reason:name === 'friction' ? 'Higher setup effort subtracts points.' : `${name} explanation`}))};
-const result = {status:'clear_recommendation',engine_version:'v0.1-final-004',evaluated_at:'2026-10-03T19:00:00Z',context,winner:choice,recommendations:[choice],ranked:[choice],excluded:[]};
-const active = {id:1,game_title_snapshot:game.title,goal_title_snapshot:goal.title,started_at:'2026-10-03T19:00:00Z'};
-let games,goals,recommendation,session,conflict;
-const reply = (payload,status=200) => Promise.resolve({ok:status<400,status,json:async()=>structuredClone(payload)});
+const game = {
+  id: 1,
+  title: "Moonlit Orchard",
+  current_interest: 4,
+  friction: 1,
+  energy_required: "low",
+  social_mode: "solo",
+  experience_tags: ["chill", "progression"],
+  notes: "Bring seeds",
+  archived_at: null,
+};
+const goal = {
+  id: 1,
+  game_id: 1,
+  title: "Harvest crops",
+  estimated_minutes: 30,
+  priority: 2,
+  notes: null,
+  status: "active",
+};
+const context = {
+  available_minutes: 45,
+  energy: "medium",
+  social_preference: "either",
+  desired_experience: "progression",
+};
+const breakdown = {
+  interest: 18.75,
+  goal_priority: 7.5,
+  time_fit: 10,
+  energy_fit: 30,
+  experience_fit: 20,
+  friction: -2,
+  recent_play: 0,
+};
+const choice = {
+  candidate: {
+    game_id: 1,
+    goal_id: 1,
+    game_title: game.title,
+    goal_title: goal.title,
+    estimated_minutes: 30,
+    energy_required: "low",
+    social_mode: "solo",
+  },
+  score: 84.25,
+  suitability: 60,
+  suitable: true,
+  unsuitable_reasons: [],
+  breakdown,
+  factors: Object.entries(breakdown).map(([name, points]) => ({
+    name,
+    points,
+    weight: 10,
+    inputs: { value: 1 },
+    reason:
+      name === "friction"
+        ? "Higher setup effort subtracts points."
+        : `${name} explanation`,
+  })),
+};
+const result = {
+  status: "clear_recommendation",
+  engine_version: "v0.1-final-004",
+  evaluated_at: "2026-10-03T19:00:00Z",
+  context,
+  winner: choice,
+  recommendations: [choice],
+  ranked: [choice],
+  excluded: [],
+};
+const active = {
+  id: 1,
+  game_title_snapshot: game.title,
+  goal_title_snapshot: goal.title,
+  started_at: "2026-10-03T19:00:00Z",
+};
+let games, goals, recommendation, session, conflict;
+const reply = (payload, status = 200) =>
+  Promise.resolve({
+    ok: status < 400,
+    status,
+    json: async () => structuredClone(payload),
+  });
 
 beforeEach(() => {
-  games=[structuredClone(game)];goals=[structuredClone(goal)];recommendation=structuredClone(result);session=null;conflict=null;
-  vi.stubGlobal('fetch', vi.fn((url,options={}) => {
-    const body=options.body ? JSON.parse(options.body) : null;
-    const method=options.method || 'GET';
-    if(url === '/api/sessions/active') return reply(session);
-    if(url === '/api/recommendations') {recommendation.context=body;return reply(recommendation);}
-    if(url === '/api/sessions/start') {if(conflict) return reply({detail:conflict},409);session={...active,goal_title_snapshot:body.goal_id===2 ? 'Build a shed' : goal.title};return reply(session,201);}
-    if(url.startsWith('/api/games?')) return reply(games);
-    if(url.startsWith('/api/goals?')) return reply(goals);
-    if(url==='/api/games' && method==='POST') {const row={...body,id:2,archived_at:null};games.push(row);return reply(row,201);}
-    if(url==='/api/games/1' && method==='PATCH') {Object.assign(games[0],body);return reply(games[0]);}
-    if(url==='/api/games/1' && method==='DELETE') {games[0].archived_at='2026-10-03';return reply(null,204);}
-    if(url==='/api/games/1/restore') {games[0].archived_at=null;return reply(games[0]);}
-    if(url==='/api/goals' && method==='POST') {const row={...body,id:2,status:'active'};goals.push(row);return reply(row,201);}
-    if(url==='/api/goals/1' && method==='PATCH') {Object.assign(goals[0],body);return reply(goals[0]);}
-    if(url==='/api/goals/1' && method==='DELETE') {goals[0].status='archived';return reply(null,204);}
-    if(url==='/api/goals/1/complete') {goals[0].status='completed';return reply(goals[0]);}
-    if(url==='/api/goals/1/restore') {goals[0].status='active';return reply(goals[0]);}
-    throw new Error(`Unmocked ${method} ${url}`);
-  }));
+  games = [structuredClone(game)];
+  goals = [structuredClone(goal)];
+  recommendation = structuredClone(result);
+  session = null;
+  conflict = null;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url, options = {}) => {
+      const body = options.body ? JSON.parse(options.body) : null;
+      const method = options.method || "GET";
+      if (url === "/api/sessions/active") return reply(session);
+      if (url === "/api/recommendations") {
+        recommendation.context = body;
+        return reply(recommendation);
+      }
+      if (url === "/api/sessions/start") {
+        if (conflict) return reply({ detail: conflict }, 409);
+        session = {
+          ...active,
+          goal_title_snapshot: body.goal_id === 2 ? "Build a shed" : goal.title,
+        };
+        return reply(session, 201);
+      }
+      if (url.startsWith("/api/games?")) return reply(games);
+      if (url.startsWith("/api/goals?")) return reply(goals);
+      if (url === "/api/games" && method === "POST") {
+        const row = { ...body, id: 2, archived_at: null };
+        games.push(row);
+        return reply(row, 201);
+      }
+      if (url === "/api/games/1" && method === "PATCH") {
+        Object.assign(games[0], body);
+        return reply(games[0]);
+      }
+      if (url === "/api/games/1" && method === "DELETE") {
+        games[0].archived_at = "2026-10-03";
+        return reply(null, 204);
+      }
+      if (url === "/api/games/1/restore") {
+        games[0].archived_at = null;
+        return reply(games[0]);
+      }
+      if (url === "/api/goals" && method === "POST") {
+        const row = { ...body, id: 2, status: "active" };
+        goals.push(row);
+        return reply(row, 201);
+      }
+      if (url === "/api/goals/1" && method === "PATCH") {
+        Object.assign(goals[0], body);
+        return reply(goals[0]);
+      }
+      if (url === "/api/goals/1" && method === "DELETE") {
+        goals[0].status = "archived";
+        return reply(null, 204);
+      }
+      if (url === "/api/goals/1/complete") {
+        goals[0].status = "completed";
+        return reply(goals[0]);
+      }
+      if (url === "/api/goals/1/restore") {
+        goals[0].status = "active";
+        return reply(goals[0]);
+      }
+      throw new Error(`Unmocked ${method} ${url}`);
+    }),
+  );
 });
 
-async function ready() {render(<App/>);await waitFor(()=>expect(screen.queryByText('Checking your active session…')).not.toBeInTheDocument());return userEvent.setup();}
-async function recommend(user) {await user.click(screen.getByRole('button',{name:'Find my next quest'}));await screen.findByRole('heading',{name:'Here’s your next quest.'});}
-async function library(user) {await user.click(screen.getByRole('button',{name:'Library',exact:true}));await screen.findByRole('button',{name:/low energy.*Moonlit Orchard/});await user.click(screen.getByRole('button',{name:/low energy.*Moonlit Orchard/}));await screen.findByRole('heading',{name:'Harvest crops'});}
-const sent = (url,method) => fetch.mock.calls.filter(([path,options])=>path===url && options?.method===method).map(([,options])=>JSON.parse(options.body || 'null'));
+async function ready() {
+  render(<App />);
+  await waitFor(() =>
+    expect(
+      screen.queryByText("Checking your active session…"),
+    ).not.toBeInTheDocument(),
+  );
+  return userEvent.setup();
+}
+async function recommend(user) {
+  await user.click(screen.getByRole("button", { name: "Find my next quest" }));
+  await screen.findByRole("heading", { name: "Here’s your next quest." });
+}
+async function library(user) {
+  await user.click(
+    screen.getByRole("button", { name: "Library", exact: true }),
+  );
+  await screen.findByRole("button", { name: /low energy.*Moonlit Orchard/ });
+  await user.click(
+    screen.getByRole("button", { name: /low energy.*Moonlit Orchard/ }),
+  );
+  await screen.findByRole("heading", { name: "Harvest crops" });
+}
+const sent = (url, method) =>
+  fetch.mock.calls
+    .filter(([path, options]) => path === url && options?.method === method)
+    .map(([, options]) => JSON.parse(options.body || "null"));
 
-describe('Tonight',()=>{
-  it('constructs the four-field request from controls',async()=>{const user=await ready();await user.clear(screen.getByLabelText('Available time'));await user.type(screen.getByLabelText('Available time'),'90');await user.selectOptions(screen.getByLabelText('Your energy'),'high');await user.selectOptions(screen.getByLabelText('Who’s playing?'),'social');await user.selectOptions(screen.getByLabelText('What are you looking for?'),'challenge');await recommend(user);expect(sent('/api/recommendations','POST')).toEqual([{available_minutes:90,energy:'high',social_preference:'social',desired_experience:'challenge'}]);});
-  it('renders a clear recommendation and factor explanations',async()=>{const user=await ready();await recommend(user);expect(screen.getByRole('heading',{name:'Harvest crops'})).toBeInTheDocument();expect(screen.getByText('84.25')).toBeInTheDocument();expect(screen.getByText('60')).toBeInTheDocument();await user.click(screen.getByText('Why this? See all score factors'));expect(screen.getByText('Higher setup effort subtracts points.')).toBeVisible();expect(screen.getByText('-2 points')).toBeVisible();expect(screen.getByText('+30 points')).toBeVisible();expect(screen.getByText(/Scores are points, not confidence percentages/)).toBeInTheDocument();});
-  it('offers equivalent alternatives without declaring a unique winner',async()=>{recommendation.status='multiple_equivalent';recommendation.recommendations.push({...structuredClone(choice),candidate:{...choice.candidate,goal_id:2,goal_title:'Build a shed'}});const user=await ready();await user.click(screen.getByRole('button',{name:'Find my next quest'}));await screen.findByRole('heading',{name:'A few equally good choices.'});await user.click(screen.getByRole('radio',{name:/Build a shed/}));await user.click(screen.getByRole('button',{name:'Start selected quest'}));expect(sent('/api/sessions/start','POST')[0]).toEqual({game_id:1,goal_id:2,situation:context});await screen.findByText('Session active');expect(screen.getByText('Session active').parentElement).toHaveTextContent('Build a shed');});
-  it.each([['no_good_fit','Available, but not a good fit.'],['no_eligible','No quest fits this session yet.']])('renders %s without start controls',async(status,title)=>{recommendation.status=status;recommendation.recommendations=[];recommendation.winner=null;if(status==='no_good_fit'){recommendation.ranked[0].suitable=false;recommendation.ranked[0].unsuitable_reasons=['Not enough suitability.'];}else{recommendation.excluded=[{candidate:choice.candidate,reasons:['Estimated time exceeds available time.']}];recommendation.ranked=[];}const user=await ready();await user.click(screen.getByRole('button',{name:'Find my next quest'}));await screen.findByRole('heading',{name:title});expect(screen.queryByRole('button',{name:'Start selected quest'})).not.toBeInTheDocument();await user.click(screen.getByText('Other quests: exclusions and fit details'));expect(screen.getByText(status==='no_good_fit' ? 'Not enough suitability.' : 'Estimated time exceeds available time.')).toBeVisible();});
-  it('starts the selected recommendation with saved context and prevents duplicates',async()=>{const user=await ready();await recommend(user);await user.dblClick(screen.getByRole('button',{name:'Start selected quest'}));await screen.findByText('Session active');expect(sent('/api/sessions/start','POST')).toEqual([{game_id:1,goal_id:1,situation:context}]);expect(screen.getByRole('button',{name:'A session is already active'})).toBeDisabled();});
-  it('handles stale starts and offers a refresh',async()=>{conflict={message:'Selected pair is no longer a recommendation choice; request a new recommendation',recommendation:{status:'no_eligible'}};const user=await ready();await recommend(user);await user.click(screen.getByRole('button',{name:'Start selected quest'}));await screen.findByRole('alert');expect(screen.getByRole('button',{name:'Start selected quest'})).toBeDisabled();expect(screen.getByRole('button',{name:'Refresh recommendation'})).toBeEnabled();await user.click(screen.getByRole('button',{name:'Refresh recommendation'}));await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(screen.getByRole('button',{name:'Start selected quest'})).toBeEnabled();});
-  it('recovers existing active sessions on initial load',async()=>{session=active;const user=await ready();expect(screen.getByText('Session active')).toBeInTheDocument();await recommend(user);expect(screen.getByRole('button',{name:'A session is already active'})).toBeDisabled();expect(screen.queryByRole('button',{name:/Finish session/})).not.toBeInTheDocument();});
-  it('handles a session started in another tab',async()=>{const user=await ready();await recommend(user);session=active;conflict={message:'Finish the active session before starting another',active_session_id:1};await user.click(screen.getByRole('button',{name:'Start selected quest'}));await screen.findByText('Session active');expect(screen.getByRole('alert')).toHaveTextContent('Finish the active session');});
-  it('discards displayed results when the situation changes',async()=>{const user=await ready();await recommend(user);await user.selectOptions(screen.getByLabelText('Your energy'),'low');expect(screen.queryByRole('button',{name:'Start selected quest'})).not.toBeInTheDocument();});
-  it('blocks starting until active-session state is known',async()=>{fetch.mockImplementationOnce(()=>reply({detail:'unavailable'},503));const user=await ready();await recommend(user);expect(screen.getByRole('button',{name:'Check active session before starting'})).toBeDisabled();await user.click(screen.getByRole('button',{name:'Retry session check'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Start selected quest'})).toBeEnabled());});
+describe("Tonight", () => {
+  it("constructs the four-field request from controls", async () => {
+    const user = await ready();
+    await user.clear(screen.getByLabelText("Available time"));
+    await user.type(screen.getByLabelText("Available time"), "90");
+    await user.selectOptions(screen.getByLabelText("Your energy"), "high");
+    await user.selectOptions(screen.getByLabelText("Who’s playing?"), "social");
+    await user.selectOptions(
+      screen.getByLabelText("What are you looking for?"),
+      "challenge",
+    );
+    await recommend(user);
+    expect(sent("/api/recommendations", "POST")).toEqual([
+      {
+        available_minutes: 90,
+        energy: "high",
+        social_preference: "social",
+        desired_experience: "challenge",
+      },
+    ]);
+  });
+  it("renders a clear recommendation and factor explanations", async () => {
+    const user = await ready();
+    await recommend(user);
+    expect(
+      screen.getByRole("heading", { name: "Harvest crops" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("84.25")).toBeInTheDocument();
+    expect(screen.getByText("60")).toBeInTheDocument();
+    await user.click(screen.getByText("Why this? See all score factors"));
+    expect(
+      screen.getByText("Higher setup effort subtracts points."),
+    ).toBeVisible();
+    expect(screen.getByText("-2 points")).toBeVisible();
+    expect(screen.getByText("+30 points")).toBeVisible();
+    expect(
+      screen.getByText(/Scores are points, not confidence percentages/),
+    ).toBeInTheDocument();
+  });
+  it("offers equivalent alternatives without declaring a unique winner", async () => {
+    recommendation.status = "multiple_equivalent";
+    recommendation.recommendations.push({
+      ...structuredClone(choice),
+      candidate: {
+        ...choice.candidate,
+        goal_id: 2,
+        goal_title: "Build a shed",
+      },
+    });
+    const user = await ready();
+    await user.click(
+      screen.getByRole("button", { name: "Find my next quest" }),
+    );
+    await screen.findByRole("heading", { name: "A few equally good choices." });
+    await user.click(screen.getByRole("radio", { name: /Build a shed/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    );
+    expect(sent("/api/sessions/start", "POST")[0]).toEqual({
+      game_id: 1,
+      goal_id: 2,
+      situation: context,
+    });
+    await screen.findByText("Session active");
+    expect(screen.getByText("Session active").parentElement).toHaveTextContent(
+      "Build a shed",
+    );
+  });
+  it.each([
+    ["no_good_fit", "Available, but not a good fit."],
+    ["no_eligible", "No quest fits this session yet."],
+  ])("renders %s without start controls", async (status, title) => {
+    recommendation.status = status;
+    recommendation.recommendations = [];
+    recommendation.winner = null;
+    if (status === "no_good_fit") {
+      recommendation.ranked[0].suitable = false;
+      recommendation.ranked[0].unsuitable_reasons = ["Not enough suitability."];
+    } else {
+      recommendation.excluded = [
+        {
+          candidate: choice.candidate,
+          reasons: ["Estimated time exceeds available time."],
+        },
+      ];
+      recommendation.ranked = [];
+    }
+    const user = await ready();
+    await user.click(
+      screen.getByRole("button", { name: "Find my next quest" }),
+    );
+    await screen.findByRole("heading", { name: title });
+    expect(
+      screen.queryByRole("button", { name: "Start selected quest" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByText("Other quests: exclusions and fit details"),
+    );
+    expect(
+      screen.getByText(
+        status === "no_good_fit"
+          ? "Not enough suitability."
+          : "Estimated time exceeds available time.",
+      ),
+    ).toBeVisible();
+  });
+  it("starts the selected recommendation with saved context and prevents duplicates", async () => {
+    const user = await ready();
+    await recommend(user);
+    await user.dblClick(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    );
+    await screen.findByText("Session active");
+    expect(sent("/api/sessions/start", "POST")).toEqual([
+      { game_id: 1, goal_id: 1, situation: context },
+    ]);
+    expect(
+      screen.getByRole("button", { name: "A session is already active" }),
+    ).toBeDisabled();
+  });
+  it("handles stale starts and offers a refresh", async () => {
+    conflict = {
+      message:
+        "Selected pair is no longer a recommendation choice; request a new recommendation",
+      recommendation: { status: "no_eligible" },
+    };
+    const user = await ready();
+    await recommend(user);
+    await user.click(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    );
+    await screen.findByRole("alert");
+    expect(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Refresh recommendation" }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole("button", { name: "Refresh recommendation" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    ).toBeEnabled();
+  });
+  it("recovers existing active sessions on initial load", async () => {
+    session = active;
+    const user = await ready();
+    expect(screen.getByText("Session active")).toBeInTheDocument();
+    await recommend(user);
+    expect(
+      screen.getByRole("button", { name: "A session is already active" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /Finish session/ }),
+    ).not.toBeInTheDocument();
+  });
+  it("handles a session started in another tab", async () => {
+    const user = await ready();
+    await recommend(user);
+    session = active;
+    conflict = {
+      message: "Finish the active session before starting another",
+      active_session_id: 1,
+    };
+    await user.click(
+      screen.getByRole("button", { name: "Start selected quest" }),
+    );
+    await screen.findByText("Session active");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Finish the active session",
+    );
+  });
+  it("discards displayed results when the situation changes", async () => {
+    const user = await ready();
+    await recommend(user);
+    await user.selectOptions(screen.getByLabelText("Your energy"), "low");
+    expect(
+      screen.queryByRole("button", { name: "Start selected quest" }),
+    ).not.toBeInTheDocument();
+  });
+  it("blocks starting until active-session state is known", async () => {
+    fetch.mockImplementationOnce(() => reply({ detail: "unavailable" }, 503));
+    const user = await ready();
+    await recommend(user);
+    expect(
+      screen.getByRole("button", {
+        name: "Check active session before starting",
+      }),
+    ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "Retry session check" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start selected quest" }),
+      ).toBeEnabled(),
+    );
+  });
 });
 
-describe('Library',()=>{
-  it('shows an empty library with useful next steps',async()=>{games=[];const user=await ready();await user.click(screen.getByRole('button',{name:'Library',exact:true}));await screen.findByRole('heading',{name:'No games yet.'});expect(screen.getByText(/Add something you’re currently playing/)).toBeInTheDocument();});
-  it('creates games with all scoring metadata',async()=>{const user=await ready();await user.click(screen.getByRole('button',{name:'Library',exact:true}));await user.click(screen.getByRole('button',{name:'Add game',exact:true}));await user.type(screen.getByLabelText('Game title'),'Clockwork Peaks');await user.selectOptions(screen.getByLabelText('Current interest'),'5');await user.selectOptions(screen.getByLabelText('Setup friction'),'2');await user.selectOptions(screen.getByLabelText('Energy required'),'high');await user.selectOptions(screen.getByLabelText('Play style'),'both');await user.click(screen.getByRole('checkbox',{name:'Challenge',exact:true}));await user.type(screen.getByLabelText('Game notes'),'Climb the tower');await user.click(screen.getByRole('button',{name:'Save game'}));await screen.findByRole('heading',{name:'Clockwork Peaks'});expect(sent('/api/games','POST')[0]).toEqual({title:'Clockwork Peaks',current_interest:5,friction:2,energy_required:'high',social_mode:'both',experience_tags:['progression','challenge'],notes:'Climb the tower'});});
-  it('edits game metadata without sending read-only fields',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Edit game',exact:true}));await user.clear(screen.getByLabelText('Game title'));await user.type(screen.getByLabelText('Game title'),'Orchard revisited');await user.click(screen.getByRole('button',{name:'Save game'}));await screen.findByRole('heading',{name:'Orchard revisited'});expect(sent('/api/games/1','PATCH')[0]).not.toHaveProperty('id');expect(sent('/api/games/1','PATCH')[0].title).toBe('Orchard revisited');});
-  it('archives and restores games',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Archive game'}));await screen.findByRole('button',{name:'Restore game'});expect(screen.getByRole('button',{name:'Add goal'})).toBeDisabled();await user.click(screen.getByRole('checkbox',{name:'Show archived'}));expect(screen.getByRole('button',{name:/Archived Moonlit Orchard/})).toBeInTheDocument();await user.click(screen.getByRole('button',{name:'Restore game'}));await screen.findByRole('button',{name:'Archive game'});expect(fetch.mock.calls.some(([url,options])=>url==='/api/games/1'&&options.method==='DELETE')).toBe(true);expect(fetch.mock.calls.some(([url])=>url==='/api/games/1/restore')).toBe(true);});
-  it('creates goals with the selected parent',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Add goal'}));await user.type(screen.getByLabelText('Goal title'),'Build a greenhouse');await user.clear(screen.getByLabelText('Estimated minutes'));await user.type(screen.getByLabelText('Estimated minutes'),'20');await user.selectOptions(screen.getByLabelText('Goal priority'),'3');await user.click(screen.getByRole('button',{name:'Save goal'}));await screen.findByRole('heading',{name:'Build a greenhouse'});expect(sent('/api/goals','POST')[0]).toEqual({game_id:1,title:'Build a greenhouse',estimated_minutes:20,priority:3,notes:null});});
-  it('edits goals without changing the parent',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Edit goal'}));await user.clear(screen.getByLabelText('Goal title'));await user.type(screen.getByLabelText('Goal title'),'Harvest autumn crops');await user.click(screen.getByRole('button',{name:'Save goal'}));await screen.findByRole('heading',{name:'Harvest autumn crops'});expect(sent('/api/goals/1','PATCH')[0]).not.toHaveProperty('game_id');});
-  it('completes and reopens a goal',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Complete goal'}));await screen.findByText('completed');await user.click(screen.getByRole('button',{name:'Reopen goal'}));await screen.findByText('active');expect(fetch.mock.calls.some(([url])=>url==='/api/goals/1/complete')).toBe(true);});
-  it('archives and restores a goal',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Archive goal'}));await screen.findByText('archived');await user.click(screen.getByRole('button',{name:'Restore goal'}));await screen.findByText('active');expect(fetch.mock.calls.some(([url,options])=>url==='/api/goals/1'&&options.method==='DELETE')).toBe(true);});
-  it('requires an experience tag',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Edit game',exact:true}));await user.click(screen.getByRole('checkbox',{name:'Chill',exact:true}));await user.click(screen.getByRole('checkbox',{name:'Progression',exact:true}));expect(screen.getByRole('button',{name:'Save game'})).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one experience');});
-  it('presents backend validation errors and keeps the editor open',async()=>{const user=await ready();await library(user);await user.click(screen.getByRole('button',{name:'Edit game',exact:true}));fetch.mockImplementationOnce(()=>reply({detail:[{loc:['body','title'],msg:'Value error, title must not be blank'}]},422));await user.click(screen.getByRole('button',{name:'Save game'}));await screen.findByRole('alert');expect(screen.getByRole('alert')).toHaveTextContent('title must not be blank');expect(screen.getByRole('form',{name:'Edit game'})).toBeInTheDocument();});
+describe("Library", () => {
+  it("shows an empty library with useful next steps", async () => {
+    games = [];
+    const user = await ready();
+    await user.click(
+      screen.getByRole("button", { name: "Library", exact: true }),
+    );
+    await screen.findByRole("heading", { name: "No games yet." });
+    expect(
+      screen.getByText(/Add something you’re currently playing/),
+    ).toBeInTheDocument();
+  });
+  it("creates games with all scoring metadata", async () => {
+    const user = await ready();
+    await user.click(
+      screen.getByRole("button", { name: "Library", exact: true }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Add game", exact: true }),
+    );
+    await user.type(screen.getByLabelText("Game title"), "Clockwork Peaks");
+    await user.selectOptions(screen.getByLabelText("Current interest"), "5");
+    await user.selectOptions(screen.getByLabelText("Setup friction"), "2");
+    await user.selectOptions(screen.getByLabelText("Energy required"), "high");
+    await user.selectOptions(screen.getByLabelText("Play style"), "both");
+    await user.click(
+      screen.getByRole("checkbox", { name: "Challenge", exact: true }),
+    );
+    await user.type(screen.getByLabelText("Game notes"), "Climb the tower");
+    await user.click(screen.getByRole("button", { name: "Save game" }));
+    await screen.findByRole("heading", { name: "Clockwork Peaks" });
+    expect(sent("/api/games", "POST")[0]).toEqual({
+      title: "Clockwork Peaks",
+      current_interest: 5,
+      friction: 2,
+      energy_required: "high",
+      social_mode: "both",
+      experience_tags: ["progression", "challenge"],
+      notes: "Climb the tower",
+    });
+  });
+  it("edits game metadata without sending read-only fields", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(
+      screen.getByRole("button", { name: "Edit game", exact: true }),
+    );
+    await user.clear(screen.getByLabelText("Game title"));
+    await user.type(screen.getByLabelText("Game title"), "Orchard revisited");
+    await user.click(screen.getByRole("button", { name: "Save game" }));
+    await screen.findByRole("heading", { name: "Orchard revisited" });
+    expect(sent("/api/games/1", "PATCH")[0]).not.toHaveProperty("id");
+    expect(sent("/api/games/1", "PATCH")[0].title).toBe("Orchard revisited");
+  });
+  it("archives and restores games", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Archive game" }));
+    await screen.findByRole("button", { name: "Restore game" });
+    expect(screen.getByRole("button", { name: "Add goal" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "Show archived" }));
+    expect(
+      screen.getByRole("button", { name: /Archived Moonlit Orchard/ }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restore game" }));
+    await screen.findByRole("button", { name: "Archive game" });
+    expect(
+      fetch.mock.calls.some(
+        ([url, options]) =>
+          url === "/api/games/1" && options.method === "DELETE",
+      ),
+    ).toBe(true);
+    expect(
+      fetch.mock.calls.some(([url]) => url === "/api/games/1/restore"),
+    ).toBe(true);
+  });
+  it("creates goals with the selected parent", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Add goal" }));
+    await user.type(screen.getByLabelText("Goal title"), "Build a greenhouse");
+    await user.clear(screen.getByLabelText("Estimated minutes"));
+    await user.type(screen.getByLabelText("Estimated minutes"), "20");
+    await user.selectOptions(screen.getByLabelText("Goal priority"), "3");
+    await user.click(screen.getByRole("button", { name: "Save goal" }));
+    await screen.findByRole("heading", { name: "Build a greenhouse" });
+    expect(sent("/api/goals", "POST")[0]).toEqual({
+      game_id: 1,
+      title: "Build a greenhouse",
+      estimated_minutes: 20,
+      priority: 3,
+      notes: null,
+    });
+  });
+  it("edits goals without changing the parent", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Edit goal" }));
+    await user.clear(screen.getByLabelText("Goal title"));
+    await user.type(
+      screen.getByLabelText("Goal title"),
+      "Harvest autumn crops",
+    );
+    await user.click(screen.getByRole("button", { name: "Save goal" }));
+    await screen.findByRole("heading", { name: "Harvest autumn crops" });
+    expect(sent("/api/goals/1", "PATCH")[0]).not.toHaveProperty("game_id");
+  });
+  it("completes and reopens a goal", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Complete goal" }));
+    await screen.findByText("completed");
+    await user.click(screen.getByRole("button", { name: "Reopen goal" }));
+    await screen.findByText("active");
+    expect(
+      fetch.mock.calls.some(([url]) => url === "/api/goals/1/complete"),
+    ).toBe(true);
+  });
+  it("archives and restores a goal", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Archive goal" }));
+    await screen.findByText("archived");
+    await user.click(screen.getByRole("button", { name: "Restore goal" }));
+    await screen.findByText("active");
+    expect(
+      fetch.mock.calls.some(
+        ([url, options]) =>
+          url === "/api/goals/1" && options.method === "DELETE",
+      ),
+    ).toBe(true);
+  });
+  it("requires an experience tag", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(
+      screen.getByRole("button", { name: "Edit game", exact: true }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Chill", exact: true }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Progression", exact: true }),
+    );
+    expect(screen.getByRole("button", { name: "Save game" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Choose at least one experience",
+    );
+  });
+  it("presents backend validation errors and keeps the editor open", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(
+      screen.getByRole("button", { name: "Edit game", exact: true }),
+    );
+    fetch.mockImplementationOnce(() =>
+      reply(
+        {
+          detail: [
+            {
+              loc: ["body", "title"],
+              msg: "Value error, title must not be blank",
+            },
+          ],
+        },
+        422,
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Save game" }));
+    await screen.findByRole("alert");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "title must not be blank",
+    );
+    expect(screen.getByRole("form", { name: "Edit game" })).toBeInTheDocument();
+  });
 });
 
-describe('API failures',()=>{
-  it('turns network failure into a useful message',async()=>{fetch.mockRejectedValueOnce(new TypeError('network details'));await expect(request('/games')).rejects.toThrow('Cannot reach Sidequest');});
-  it('does not expose server traceback details',async()=>{fetch.mockImplementationOnce(()=>reply({detail:'Internal traceback secret'},500));await expect(request('/games')).rejects.toThrow('Sidequest is unavailable or busy');});
+describe("API failures", () => {
+  it("does not let an older recovery request overwrite newer active state", async () => {
+    session = active;
+    let resolveFirst;
+    fetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+    await screen.findByText("Session active");
+    await act(async () => {
+      resolveFirst(await reply(null));
+    });
+    expect(screen.getByText("Session active")).toBeInTheDocument();
+  });
+  it("retries failed goals as well as the library", async () => {
+    const user = await ready();
+    await user.click(
+      screen.getByRole("button", { name: "Library", exact: true }),
+    );
+    const card = await screen.findByRole("button", {
+      name: /low energy.*Moonlit Orchard/,
+    });
+    fetch.mockImplementationOnce(() => reply({ detail: "busy" }, 503));
+    await user.click(card);
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Retry library" }));
+    await screen.findByRole("heading", { name: "Harvest crops" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("distinguishes a saved change from a failed refresh", async () => {
+    const user = await ready();
+    await library(user);
+    await user.click(screen.getByRole("button", { name: "Edit goal" }));
+    const original = fetch.getMockImplementation();
+    fetch
+      .mockImplementationOnce(original)
+      .mockImplementationOnce(() => reply({ detail: "busy" }, 503));
+    await user.click(screen.getByRole("button", { name: "Save goal" }));
+    await screen.findByRole("alert");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your change was saved",
+    );
+    expect(
+      screen.queryByRole("form", { name: "Edit goal" }),
+    ).not.toBeInTheDocument();
+  });
+  it("turns network failure into a useful message", async () => {
+    fetch.mockRejectedValueOnce(new TypeError("network details"));
+    await expect(request("/games")).rejects.toThrow("Cannot reach Sidequest");
+  });
+  it("does not expose server traceback details", async () => {
+    fetch.mockImplementationOnce(() =>
+      reply({ detail: "Internal traceback secret" }, 500),
+    );
+    await expect(request("/games")).rejects.toThrow(
+      "Sidequest is unavailable or busy",
+    );
+  });
 });

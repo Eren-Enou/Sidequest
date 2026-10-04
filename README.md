@@ -4,11 +4,11 @@ A personal gaming session recommendation web application answering: **What shoul
 
 ## Current status
 
-Milestones 1-4 are complete: frozen scoring policy `v0.1-final-004`, SQLite persistence, library/recommendation APIs, and the complete session lifecycle/history API. The application supports the full play-session loop through the API. React remains pending; Milestone 5 requires a separate instruction.
+Milestones 1-5 are complete: frozen scoring policy `v0.1-final-004`, SQLite persistence, library/recommendation/session APIs, and a React library and recommendation interface. You can maintain games/goals, get explained recommendations, and start a session in the browser. Finish and history screens remain Milestone 6 and require a separate instruction.
 
 ## Stack and layout
 
-Python 3.12, FastAPI, Pydantic, synchronous SQLAlchemy, and SQLite are implemented. React/JavaScript/Vite remain planned.
+Python 3.12, FastAPI, Pydantic, synchronous SQLAlchemy, SQLite, React/JavaScript, and Vite are implemented.
 
 ```text
 backend/
@@ -18,7 +18,9 @@ backend/
   experiments/  # Frozen baseline and historical comparison policies
   tests/        # Scoring, historical policy, library/API, persistence checks
   data/         # Local SQLite database, ignored by Git
-frontend/src/   # Placeholder only
+frontend/
+  src/          # App shell, API access, views, forms, components, frontend tests
+  package.json  # React/Vite and test commands; locked dependencies
 reports/        # Immutable numbered reports and mutable index
 PROJECT.md
 IMPLEMENTATION_PLAN.md
@@ -36,7 +38,7 @@ Set-Location backend
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --host 127.0.0.1
 ```
 
-For a runtime-only installation use `requirements.txt`; `requirements-dev.txt` includes runtime dependencies plus pytest and the TestClient HTTP dependency. Tested direct versions are pinned. Interactive API documentation is at [localhost:8000/docs](http://127.0.0.1:8000/docs). There is no frontend server yet.
+For a runtime-only installation use `requirements.txt`; `requirements-dev.txt` includes runtime dependencies plus pytest and the TestClient HTTP dependency. Tested direct versions are pinned. Interactive API documentation is at [localhost:8000/docs](http://127.0.0.1:8000/docs). Run the frontend in a second terminal as described below.
 
 The default database is `backend/data/sidequest.sqlite3`, independent of the shell's working directory. Set `SIDEQUEST_DB_PATH` to use a different file. Relative configured paths are resolved against `backend/`:
 
@@ -174,6 +176,32 @@ API tests migrate isolated temporary SQLite files and never use the personal dat
 
 See [report 005](reports/005_milestone_2_database_library_api.md) for persistence decisions, [report 006](reports/006_milestone_3_recommendation_api.md) for recommendation integration, and [report 007](reports/007_milestone_4_session_lifecycle.md) for lifecycle contracts and validation evidence. Historical investigations remain in numbered immutable reports; the reports index records later outcomes without rewriting earlier evidence.
 
-## Future frontend setup
+## Local frontend setup
 
-React and Vite have not been initialized. Later milestones will add `npm install`, `npm run dev`, and a development `/api` proxy. No Docker, authentication, cloud services, or deployment infrastructure are required for this local application.
+Use a supported Node.js branch (20.19+, 22.13+, or 24+); tested with Node 24.13.0 and npm 11.6.2. From the repository root in a second PowerShell terminal:
+
+```powershell
+Set-Location frontend
+npm ci
+npm run dev
+```
+
+Open [Sidequest at localhost:5173](http://127.0.0.1:5173). Vite binds to loopback and proxies `/api` to the backend at port 8000. The browser uses relative URLs. For a backend on another local port, set `$env:SIDEQUEST_API_TARGET = 'http://127.0.0.1:8015'` before running Vite. The development server uses a strict port to avoid silently moving to another URL.
+
+**Library:** add a game with interest, setup effort, energy, play style, experiences, and notes; select it to add session-sized goals. Games can be edited, archived, or restored. Goals can be edited, completed/reopened, archived, or restored. Archived games can be shown using the shelf checkbox. Restore an archived parent before adding/reopening/completing its goals.
+
+**Tonight:** describe time, energy, social preference, and desired experience. Results show the game/goal, score, suitability, and expandable factor calculations. Equivalent choices are presented together with a radio selection. Empty/poor-fit outcomes explain what to adjust. Starting sends the selected pair and evaluated situation to the backend for fresh validation. Conflicts offer a recommendation refresh. An active-session banner survives page reload and blocks duplicate starts.
+
+Finish controls and History navigation have not been implemented. For now, finish an active session through the documented API or `/docs` before starting another. The UI checks the backend on load and after a start conflict; changes made in another tab may require a reload. There is no browser-only session state or scoring calculation.
+
+Frontend verification from `frontend/`:
+
+```powershell
+npm test
+npm run build
+npm run preview
+```
+
+Milestone 5: **26 frontend tests passed**, all **410 backend tests passed**, and the production build passed. The actual browser smoke loop created a game and goal, recommended, inspected factors, started, and recovered the session after reload using an isolated temporary database. The production bundle was also browser-checked. See [report 008](reports/008_milestone_5_react_library_recommendation.md).
+
+`npm run preview` is a local build check, not deployment infrastructure; it inherits the same local API proxy. Production hosting is deferred; any eventual host must serve `/api` on the same origin. No Docker, authentication, cloud services, or deployment configuration is required for this local application.

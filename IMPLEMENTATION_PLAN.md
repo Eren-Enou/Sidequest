@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Milestones 1-4 complete (reports 004-007). Milestones 5-6 remain unstarted and require further user direction.
+Status: Milestones 1-5 complete (reports 004-008). Milestone 6 remains unstarted and requires further user direction.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
@@ -41,14 +41,15 @@ Completed: POST /api/recommendations maps persisted library/history into the fro
 
 Completed: start-time revalidation accepts any frozen recommendation choice, validated version-1 snapshots preserve explanations, active recovery/history survive restart, and finish optionally completes the goal atomically. SQLite writer transactions and the existing unique index protect concurrent starts; duplicate/concurrent finishes preserve history. All 410 tests pass (345 previous + 65 new), including the complete recommendation/start/finish/recency loop. Report 007 records decisions and limitations.
 
-## 5. React library and recommendation interface
+## 5. React library and recommendation interface - complete
 
 - Initialize React/JavaScript with Vite, a development API proxy, and basic styles.
 - Build game/goal management and the situation form.
 - Display the winning game/goal, factor contributions, total, and empty-state guidance.
 - Handle loading, validation, and API errors with clear messages.
+- Start any accepted recommendation choice through the existing session API and recover the active session on reload, as explicitly added to Milestone 5 by the user's request.
 
-Done when the user can maintain the library and get an explained recommendation in the browser. Verify a production build and the actual browser flow.
+Completed: React/JavaScript/Vite interface provides Tonight and Library, all game/goal management actions, four recommendation outcomes, complete expandable explanations, alternative selection, session start and active recovery. All 26 frontend tests and 410 backend tests pass; production build and actual browser smoke flow passed. Report 008 records architecture, evidence, and limitations. No finish/history UI was implemented.
 
 ## 6. React sessions and V0.1 verification
 
@@ -62,4 +63,4 @@ Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
 ## First implementation recommendation
 
-Milestones 1-4 are complete. Review reports/007_milestone_4_session_lifecycle.md before authorizing Milestone 5, the React library and recommendation interface. Frontend work remains unimplemented. The scoring policy is frozen; integration problems must be reported instead of silently changing it.
+Milestones 1-5 are complete. Review reports/008_milestone_5_react_library_recommendation.md before authorizing Milestone 6, the finish/history UI and full V0.1 verification. Start and active recovery are already implemented; Milestone 6 should extend them. The scoring policy and backend behavior remain frozen; integration problems must be reported instead of silently changing them.
