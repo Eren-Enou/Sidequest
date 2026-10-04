@@ -4,7 +4,7 @@ A personal gaming session recommendation web application answering: **What shoul
 
 ## Current status
 
-Milestones 1-5 are complete. Milestone 6 adds the active-session, finish, and history interface, completing the browser flow on the small smoke library. Final V0.1 acceptance is **blocked**: a larger-library smoke test exposed exact floating-point equality in backend snapshot validation that can reject a valid session start with HTTP 500. The frozen scoring policy `v0.1-final-004` and backend remain unchanged. See [report 009](reports/009_milestone_6_v0.1_completion.md) for the reproducible counterexample and acceptance checklist.
+**Sidequest V0.1 is complete.** All six milestones and all nine acceptance criteria are satisfied: library management, deterministic explained recommendations, session start/recovery/finish, and preserved History work through the local browser interface. Report 009's acceptance blocker was repaired with a narrowly bounded snapshot numerical-consistency check; scoring policy `v0.1-final-004` remains byte-for-byte frozen. See [report 010](reports/010_v0.1_snapshot_validation_fix.md) for final regression, browser, and acceptance evidence.
 
 ## Stack and layout
 
@@ -199,7 +199,7 @@ Open [Sidequest at localhost:5173](http://127.0.0.1:5173). Vite binds to loopbac
 
 **History:** browse date, snapshot titles, actual minutes, enjoyment, and progress; inspect notes, timestamps, original context, and saved score factors. Library edits/archives do not replace historical evidence. The next recommendation gets recency from completed backend sessions. There is no frontend scoring or recency calculation. Other-tab changes may require reload.
 
-Known blocker: recommendations can be displayed correctly yet fail at start if any eligible audit candidate encounters the snapshot numeric-equality defect described in report 009. Do not treat the passing test suites as full V0.1 readiness until that integration defect is resolved and reverified in a new numbered report.
+Snapshot validation accepts insignificant floating-point representation differences using relative and absolute tolerances of `1e-12`, while checking every ranked candidate and retaining all exact stored values. Material score/breakdown discrepancies and nonfinite totals are rejected. This integration repair changes neither scoring nor historical evidence; report 009 preserves the original failed investigation.
 
 Frontend verification from `frontend/`:
 
@@ -210,6 +210,8 @@ npm run preview
 ```
 
 Milestone 6 verification: **51 frontend tests passed** (26 preserved + 25 added), all **410 backend tests passed**, and the production build passed. An actual browser completed creation → recommendation → start → reload/recovery → finish → history → recency feedback, then confirmed snapshot preservation after renaming/archiving. A 13-game / 37-goal library exposed the session-start blocker. See [report 009](reports/009_milestone_6_v0.1_completion.md); historical Milestone 5 evidence remains in [report 008](reports/008_milestone_5_react_library_recommendation.md).
+
+Final acceptance repair: **436 backend tests passed** (410 existing + 26 new), **51 frontend tests passed**, and the production build passed. The previously failing two-candidate browser scenario now starts, survives reload, finishes, and appears in History with unmodified scores. Additional start/finish flows passed with the Milestone 6 fictional dataset (14 games / 38 goals including the two reproduction pairs). All nine PROJECT acceptance criteria are satisfied; reports 001–009 remain unchanged. See [report 010](reports/010_v0.1_snapshot_validation_fix.md).
 
 To repeat the larger-library observation, explicitly migrate a new temporary database, run the API against that file and a distinct loopback port, and point Vite's proxy at that port. Then, from the repository root:
 

@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Milestones 1-5 complete (reports 004-008). Milestone 6 interface implemented and verified; final acceptance is blocked by a backend snapshot validation defect found during larger-library testing (report 009). V0.1 is not yet declared complete.
+Status: Milestones 1-6 complete. Sidequest V0.1 is complete after the focused snapshot-validation acceptance repair and final re-verification in report 010. The scorer remains frozen at v0.1-final-004.
 
 Each milestone should produce a small reviewable result. Update the README as runnable commands become available.
 
@@ -51,7 +51,7 @@ Completed: start-time revalidation accepts any frozen recommendation choice, val
 
 Completed: React/JavaScript/Vite interface provides Tonight and Library, all game/goal management actions, four recommendation outcomes, complete expandable explanations, alternative selection, session start and active recovery. All 26 frontend tests and 410 backend tests pass; production build and actual browser smoke flow passed. Report 008 records architecture, evidence, and limitations. No finish/history UI was implemented.
 
-## 6. React sessions and V0.1 verification — acceptance blocked
+## 6. React sessions and V0.1 verification — complete
 
 - Add start/finish controls, active-session recovery on page load, and history views.
 - Suggest elapsed duration while allowing user confirmation/correction.
@@ -61,8 +61,8 @@ Completed: React/JavaScript/Vite interface provides Tonight and Library, all gam
 
 Done when every V0.1 acceptance criterion in PROJECT.md is satisfied.
 
-Implemented: full active-session view, editable elapsed-duration suggestion, finish validation/feedback/recovery, and snapshot-based History. Usability wording clarifies getting-started effort (0–5) and useful session length without changing scoring. All 51 frontend tests and 410 backend tests pass; production build and the small-library browser feedback loop pass. The 13-game / 37-goal smoke test exposes HTTP 500 on a valid session start: snapshot validation compares a projected float factor sum to the original scorer total with exact equality. An unselected audit candidate can block the winner. Report 009 contains a two-candidate reproduction. Backend code, scorer, and reports 001-008 remain unchanged. Completion is withheld pending a separately reviewed integration fix and verification recorded in report 010 or the next available number.
+Completed: full active-session view, editable elapsed-duration suggestion, finish validation/feedback/recovery, and snapshot-based History. Usability wording clarifies getting-started effort (0–5) and useful session length without changing scoring. Report 009 preserves the initial larger-library blocker. The focused authorized repair changes only snapshot score/sum numerical equivalence, with relative/absolute tolerance 1e-12 and finite-score protection. All 436 backend tests (410 existing + 26 new), 51 frontend tests, and production build pass. The previously failing browser scenario and larger-library alternative/challenge start/finish flows pass with original stored evidence intact. All nine PROJECT acceptance criteria are satisfied; reports 001-009 and the frozen scorer are unchanged. Report 010 records final acceptance.
 
-## First implementation recommendation
+## V0.1 completion decision
 
-Review report 009's numeric snapshot-validation counterexample before continuing. The next required work is a small backend integration correction and regression coverage that preserves scorer output, ranking, and all saved evidence; then repeat affected browser and acceptance checks in a new immutable report. No post-V0.1 features should begin. The scoring policy and backend behavior were preserved during this milestone; the integration problem is reported for review rather than silently changed.
+V0.1 is complete. No further milestone, deployment, or V0.2 work has begun. Preserve the accepted scorer and immutable historical reports. Any later investigation or feature requires a separate user request and a new numbered report where applicable.

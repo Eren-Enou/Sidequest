@@ -1,11 +1,17 @@
 """Explicit session contracts and versioned, validated start-time evidence."""
 from datetime import datetime
+from math import isclose, isfinite
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.recommendation_schemas import RecommendationRequest, RecommendationResponse, ScoredCandidateRead
 from app.schemas import PositiveInt
+
+# Projection coerces mixed integer/float factors to floats. Allow representation
+# noise only (at 100 points, at most ~1e-10); never round or rewrite saved evidence.
+SCORE_REL_TOL = 1e-12
+SCORE_ABS_TOL = 1e-12
 
 
 class SessionStart(BaseModel):
@@ -45,7 +51,9 @@ class RecommendationSnapshot(BaseModel):
         if not result.recommendations or result.winner != result.recommendations[0]:
             raise ValueError("Winner must match the first recommendation choice")
         for item in result.ranked:
-            if item.score != sum(item.breakdown.values()):
+            if not isfinite(item.score) or not isclose(
+                    item.score, sum(item.breakdown.values()),
+                    rel_tol=SCORE_REL_TOL, abs_tol=SCORE_ABS_TOL):
                 raise ValueError("Snapshot breakdown must sum to score")
             if {f.name: f.points for f in item.factors} != item.breakdown:
                 raise ValueError("Snapshot factor contributions must match breakdown")
