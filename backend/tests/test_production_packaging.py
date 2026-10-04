@@ -15,30 +15,78 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads((ROOT / "vercel.json").read_text())
 
 
-def service_for(path):
+@pytest.fixture(scope="module")
+def compiled_sources():
+    # npm ci in frontend installs the pinned, patched parser also used by
+    # Vercel routing-utils. Never treat rewrite source as a raw Python regex.
+    sources = [rule["source"] for rule in CONFIG["rewrites"]]
+    sources += [rule["source"] for rule in CONFIG["services"]["frontend"]["rewrites"]]
+    sources += [rule["source"] for rule in CONFIG["headers"]]
+    sources += ["^/api(?:/.*)?$", "^/(?!api(?:/|$)|assets(?:/|$)).*$"]
+    script = """
+const {pathToRegexp} = require('path-to-regexp');
+const sources = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const results = Object.fromEntries(sources.map(source => {
+  try {
+    const regex = pathToRegexp(source, [], {strict: true, sensitive: true, delimiter: '/'});
+    return [source, {regex: regex.source}];
+  } catch (error) { return [source, {error: error.message}]; }
+}));
+process.stdout.write(JSON.stringify(results));
+"""
+    result = subprocess.run(["node", "-e", script], cwd=ROOT / "frontend",
+                            input=json.dumps(sources), capture_output=True, text=True)
+    assert result.returncode == 0, "Routing syntax tests require Node and frontend npm ci"
+    return json.loads(result.stdout)
+
+
+def matches(compiled_sources, source, path):
+    compiled = compiled_sources[source]
+    assert "error" not in compiled, f"Invalid Vercel path-pattern syntax: {source}"
+    return re.fullmatch(compiled["regex"], path) is not None
+
+
+def service_for(compiled_sources, path):
     for rule in CONFIG["rewrites"]:
-        if re.fullmatch(rule["source"], path):
+        if matches(compiled_sources, rule["source"], path):
             return rule["destination"]["service"]
     return None
 
 
-@pytest.mark.parametrize("path", ["/api", "/api/", "/api/games", "/api/sessions/42/finish", "/api/missing"])
-def test_api_cannot_reach_spa(path):
-    assert service_for(path) == "backend"
+def test_routing_sources_use_supported_vercel_grammar(compiled_sources):
+    assert CONFIG["rewrites"] == [
+        {"source": "/api", "destination": {"service": "backend"}},
+        {"source": "/api/(.*)", "destination": {"service": "backend"}},
+        {"source": "/(.*)", "destination": {"service": "frontend"}},
+    ]
+    for source, compiled in compiled_sources.items():
+        if not source.startswith("^"):
+            assert "regex" in compiled
+
+
+@pytest.mark.parametrize("source", ["^/api(?:/.*)?$", "^/(?!api(?:/|$)|assets(?:/|$)).*$"])
+def test_previous_anchored_regex_sources_are_rejected(compiled_sources, source):
+    assert "error" in compiled_sources[source]
+
+
+@pytest.mark.parametrize("path", ["/api", "/api/", "/api/games", "/api/sessions/start",
+                                  "/api/sessions/42/finish", "/api/missing", "/api//missing"])
+def test_api_cannot_reach_spa(compiled_sources, path):
+    assert service_for(compiled_sources, path) == "backend"
     fallback = CONFIG["services"]["frontend"]["rewrites"][0]["source"]
-    assert not re.fullmatch(fallback, path)
+    assert not matches(compiled_sources, fallback, path)
 
 
-@pytest.mark.parametrize("path", ["/", "/library", "/history/42", "/apiculture"])
-def test_frontend_navigation_fallback(path):
-    assert service_for(path) == "frontend"
-    assert re.fullmatch(CONFIG["services"]["frontend"]["rewrites"][0]["source"], path)
+@pytest.mark.parametrize("path", ["/", "/library", "/history/42", "/apiculture", "/apiary", "/assets-gallery"])
+def test_frontend_navigation_fallback(compiled_sources, path):
+    assert service_for(compiled_sources, path) == "frontend"
+    assert matches(compiled_sources, CONFIG["services"]["frontend"]["rewrites"][0]["source"], path)
 
 
-def test_assets_do_not_use_spa():
-    path = "/assets/missing.js"
-    assert service_for(path) == "frontend"
-    assert not re.fullmatch(CONFIG["services"]["frontend"]["rewrites"][0]["source"], path)
+@pytest.mark.parametrize("path", ["/assets", "/assets/", "/assets/missing.js"])
+def test_assets_do_not_use_spa(compiled_sources, path):
+    assert service_for(compiled_sources, path) == "frontend"
+    assert not matches(compiled_sources, CONFIG["services"]["frontend"]["rewrites"][0]["source"], path)
     assert CONFIG["services"]["frontend"]["outputDirectory"] == "dist"
     assert CONFIG["services"]["frontend"]["buildCommand"] == "npm run build"
     assert json.loads((ROOT / "frontend/package.json").read_text())["scripts"]["build"] == "vite build"

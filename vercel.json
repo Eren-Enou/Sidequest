@@ -20,7 +20,7 @@
       "outputDirectory": "dist",
       "rewrites": [
         {
-          "source": "^/(?!api(?:/|$)|assets(?:/|$)).*$",
+          "source": "/:path((?!api(?:/|$)|assets(?:/|$)).*)",
           "destination": "/index.html"
         }
       ]
@@ -28,7 +28,13 @@
   },
   "rewrites": [
     {
-      "source": "^/api(?:/.*)?$",
+      "source": "/api",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/api/(.*)",
       "destination": {
         "service": "backend"
       }
