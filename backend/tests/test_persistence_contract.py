@@ -244,3 +244,20 @@ def test_big_integer_domain_range(persistence):
                                                 estimated_minutes=minutes))
     assert response.status_code == 201
     assert client.get('/api/goals/' + str(response.json()['id'])).json()['estimated_minutes'] == minutes
+
+
+def test_production_entrypoint_real_postgresql(persistence, tmp_path):
+    client, engine, _ = persistence
+    if engine.dialect.name != "postgresql":
+        pytest.skip("Production entrypoint requires PostgreSQL")
+    from test_production_packaging import packaged_process
+    seed(client)
+    code = """import index, app.main
+from fastapi.testclient import TestClient
+assert index.app is app.main.app
+with TestClient(index.app) as client:
+    assert client.get('/api/games').status_code == 200
+    assert len(client.get('/api/games').json()) == 1
+    assert client.get('/api/missing').status_code == 404
+"""
+    packaged_process(tmp_path, os.environ["DATABASE_URL"], code)

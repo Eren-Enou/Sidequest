@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import URL, make_url
+from sqlalchemy.pool import NullPool
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 WRITE_LOCK_NAMESPACE = 0x53494445  # SIDE; same lock for all Sidequest writes in this database.
@@ -67,7 +68,14 @@ def make_engine(path=None):
     if configuration.dialect != "sqlite":
         try:
             # READ COMMITTED reads current committed state after acquiring the write lock.
-            return create_engine(configuration.url, isolation_level="READ COMMITTED", hide_parameters=True)
+            options = {}
+            profile = os.environ.get("SIDEQUEST_POSTGRES_POOL", "queue")
+            if profile == "null":
+                options["poolclass"] = NullPool
+            elif profile != "queue":
+                raise ValueError("SIDEQUEST_POSTGRES_POOL must be queue or null")
+            return create_engine(configuration.url, isolation_level="READ COMMITTED",
+                                 hide_parameters=True, **options)
         except Exception:
             raise RuntimeError("DATABASE_URL engine initialization failed; PostgreSQL requires "
                                "a supported synchronous driver and valid configuration") from None

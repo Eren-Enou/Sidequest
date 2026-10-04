@@ -42,3 +42,6 @@ backend/data/*
 Thumbs.db
 Desktop.ini
 
+
+# Optional Vercel local metadata
+.vercel/

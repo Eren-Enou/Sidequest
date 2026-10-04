@@ -274,3 +274,59 @@ backend/.venv/Scripts/python.exe frontend/scripts/seed_smoke_library.py http://1
 This adds 12 fictional games and 36 goals through the library API, including archived/completed records. Each run adds new records. Use an isolated database, never the personal library. The report records the two situation inputs and the additional game/goal created in the browser.
 
 `npm run preview` is a local build check, not deployment infrastructure; it inherits the same local API proxy. Production hosting is deferred; any eventual host must serve `/api` on the same origin. No Docker, authentication, cloud services, or deployment configuration is required for this local application.
+
+## Production packaging (Deployment Step 3)
+
+No deployment exists. The repository-root `vercel.json` describes one Vercel
+project using current Services configuration: `backend/` is a FastAPI service
+and `frontend/` is a Vite/static service. These are hosting build boundaries,
+not new application microservices. The project root must remain the repository
+root. `/api` and `/api/*` route exclusively to the backend with their original
+paths; other requests reach frontend static delivery. Existing assets take
+precedence over the frontend SPA fallback. Missing assets return 404 rather
+than HTML. React currently switches screens without changing the browser path;
+`/` is its actual navigation URL. The fallback supports future direct frontend
+paths and explicitly excludes API and asset prefixes.
+
+The production ASGI entrypoint is `backend/index.py` (`index:app` relative to
+that service root). It imports the canonical `app.main.app`, creates no second
+application, and requires PostgreSQL before importing the application so missing
+configuration cannot create a local SQLite directory. `backend/.python-version`
+selects Python 3.12. Existing `backend/requirements.txt` remains the production
+manifest; there is no root copy. SQL resources are included explicitly and
+remain resolved from source paths, independent of working directory. Development
+files, local databases and environment files are excluded from upload/bundling.
+
+Frontend installation/build remain `npm ci` and `npm run build`, with `dist`
+relative to `frontend/` as the static output. FastAPI does not serve React files.
+The browser continues using relative `/api` calls; no CORS was added. Ordinary
+local Uvicorn and Vite proxy commands above are unchanged and require no Vercel
+CLI. `app.main:app` continues to support local SQLite; `index:app` is specifically
+the production PostgreSQL entrypoint.
+
+Eventually configure backend-only `DATABASE_URL` privately, with
+`SIDEQUEST_DB_PATH` absent. Set `SIDEQUEST_POSTGRES_POOL=null` for the production
+runtime to avoid retaining idle connections across process freezes/reuse.
+Absent this setting, local PostgreSQL keeps its original QueuePool; SQLite is
+unaffected. No pool size or connection budget is claimed to fit all deployments.
+For eventual Neon, use its pooled application URL with appropriate TLS options;
+use a separate direct URL privately for controlled migration/maintenance actions.
+Do not put either URL in Vite-prefixed variables or committed configuration.
+Vercel environment settings can apply to builds as well as runtime; the adapter
+may be inspected during framework builds and must have valid private configuration,
+but importing it opens no database connection.
+
+Before application traffic, from `backend/` with the maintenance database URL
+set privately, run `python -m app.migrate` explicitly. Startup validates schema
+only. Builds, requests and cold starts never apply migrations. Vercel does not
+provide the ordinary persistent SSH release shell; use an explicitly controlled
+owner-machine release action initially. Do not migrate from arbitrary preview
+builds or connect previews to personal/production data.
+
+Before any future deployment, separately verify Vercel owner-only All Deployments
+protection for frontend, API, static access, production domains and generated URLs,
+with no public exceptions or bypass links. Packaging does not configure this gate
+or add application authentication. Services is currently beta; plan/account support,
+actual Vercel routing/lifespan/bundles, hosted TLS and cold-start behavior must still
+be verified during authorized staging. Local structural tests and Linux wheel
+resolution are not an actual Vercel runtime test. See [report 014](reports/014_deployment_production_packaging.md).

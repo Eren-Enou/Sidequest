@@ -83,3 +83,14 @@ SQLite remains the local default. Report 013 records cross-dialect lifecycle,
 concurrency, rollback and full regression evidence. The next separately authorized
 step is production packaging/runtime compatibility (Deployment Step 3); do not
 deploy, create cloud resources, or begin V0.2.
+
+Deployment Step 3 is complete at the repository packaging/local-verification level:
+current Vercel Services configuration retains one project/origin, with native Vite
+static delivery and a thin canonical FastAPI production entrypoint. Python 3.12,
+existing runtime requirements, explicit migration resource inclusion and an opt-in
+PostgreSQL NullPool profile are verified locally. Report 014 distinguishes this
+from actual Vercel build/runtime deployment, which remains unverified. Services
+beta availability/protection must be checked on the eventual account before staging.
+Next separately authorized task: Deployment Step 4 only, security and backup
+acceptance procedures and any necessary safeguards, using local verification;
+do not create cloud resources, deploy, or begin V0.2.
